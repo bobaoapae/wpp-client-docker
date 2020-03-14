@@ -2,6 +2,8 @@ package br.com.zapia.wpp.client.docker;
 
 import br.com.zapia.wpp.client.docker.model.Chat;
 import br.com.zapia.wpp.client.docker.model.DriverState;
+import br.com.zapia.wpp.client.docker.model.EventType;
+import br.com.zapia.wpp.client.docker.model.Message;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
@@ -20,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class WhatsAppClientTest {
 
     private JLabel label;
+    private WhatsAppClient whatsAppClient;
 
 
     @Test
@@ -28,12 +31,45 @@ class WhatsAppClientTest {
         CompletableFuture<Void> qrCode = new CompletableFuture();
         CompletableFuture<Void> driverUpdate = new CompletableFuture();
         CompletableFuture<Void> error = new CompletableFuture();
+
+        AtomicBoolean newChat = new AtomicBoolean();
+        AtomicBoolean removeChat = new AtomicBoolean();
+        AtomicBoolean updateChat = new AtomicBoolean();
+        AtomicBoolean removeMessage = new AtomicBoolean();
+        AtomicBoolean newMessage = new AtomicBoolean();
+        AtomicBoolean updateMessage = new AtomicBoolean();
+
         AtomicBoolean initReceived = new AtomicBoolean();
 
         Runnable onInit = () -> {
             System.out.println("init");
             init.complete(null);
             initReceived.set(true);
+            whatsAppClient.addUpdateMessageListener(message -> {
+                System.out.println("updateMsg");
+                updateMessage.set(true);
+            });
+            whatsAppClient.addRemoveMessageListener(message -> {
+                System.out.println("removeMsg");
+                removeMessage.set(true);
+            });
+            whatsAppClient.addNewMessageListener(message -> {
+                System.out.println("newMsg");
+                newMessage.set(true);
+            });
+
+            whatsAppClient.addUpdateChatListener(chat -> {
+                System.out.println("updateChat");
+                updateChat.set(true);
+            });
+            whatsAppClient.addNewChatListener(chat -> {
+                System.out.println("newChat");
+                newChat.set(true);
+            });
+            whatsAppClient.addRemoveChatListener(chat -> {
+                System.out.println("removeChat");
+                removeChat.set(true);
+            });
         };
 
         Consumer<String> onNeedQrCode = (base64) -> {
@@ -46,14 +82,16 @@ class WhatsAppClientTest {
                         label,
                         "SCAN QR CODE", JOptionPane.INFORMATION_MESSAGE);
             }
-            try {
-                byte[] btDataFile = Base64.getDecoder().decode(base64.split(",")[1]);
-                BufferedImage image;
-                image = ImageIO.read(new ByteArrayInputStream(btDataFile));
-                ImageIcon icon = new ImageIcon(image.getScaledInstance(500, 500, Image.SCALE_DEFAULT));
-                label.setIcon(icon);
-            } catch (Exception ex) {
-                ex.printStackTrace();
+            if (base64 != null && base64.contains(",")) {
+                try {
+                    byte[] btDataFile = Base64.getDecoder().decode(base64.split(",")[1]);
+                    BufferedImage image;
+                    image = ImageIO.read(new ByteArrayInputStream(btDataFile));
+                    ImageIcon icon = new ImageIcon(image.getScaledInstance(500, 500, Image.SCALE_DEFAULT));
+                    label.setIcon(icon);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
             }
             qrCode.complete(null);
         };
@@ -74,18 +112,51 @@ class WhatsAppClientTest {
                 .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
                 .onNeedQrCode(onNeedQrCode);
-        WhatsAppClient whatsAppClient = builder.builder();
+        whatsAppClient = builder.builder();
         assertTrue(whatsAppClient.start().orTimeout(3, TimeUnit.MINUTES).join());
         assertDoesNotThrow(() -> {
-            CompletableFuture.allOf(CompletableFuture.anyOf(init, qrCode), driverUpdate).orTimeout(5, TimeUnit.MINUTES).join();
+            CompletableFuture.allOf(init, CompletableFuture.anyOf(init, qrCode), driverUpdate).orTimeout(5, TimeUnit.MINUTES).join();
         });
         assertDoesNotThrow(() -> {
             if (initReceived.get()) {
                 Chat chat = whatsAppClient.findChatById("554491050665@c.us").join();
+                AtomicBoolean newChatMsg = new AtomicBoolean();
+                AtomicBoolean updateChatMsg = new AtomicBoolean();
+                AtomicBoolean removeChatMsg = new AtomicBoolean();
                 assertNotNull(chat);
                 assertNotNull(chat.getContact());
                 assertEquals("4491050665", chat.getContact().getPhoneNumberNoFormatted());
+                assertTrue(chat.addMessageListener(true, message -> {
+                    newChatMsg.set(true);
+                }, EventType.ADD).join());
+                assertTrue(chat.addMessageListener(true, message -> {
+                    updateChatMsg.set(true);
+                }, EventType.CHANGE, "ack").join());
+                assertTrue(chat.addMessageListener(true, message -> {
+                    removeChatMsg.set(true);
+                }, EventType.REMOVE).join());
+                Message message = chat.sendMessage("teste").join();
+                assertNotNull(message);
+                assertEquals("teste", message.getBody());
+                Message reply = message.reply("reply").join();
+                assertNotNull(reply);
+                assertEquals("reply", reply.getBody());
+                assertTrue(message.revoke().join());
+                Thread.sleep(5000);
+                assertTrue(message.delete().join());
+                Thread.sleep(5000);
+                assertTrue(chat.delete().join());
+                Thread.sleep(5000);
+                assertTrue(newChatMsg.get());
+                assertTrue(updateChatMsg.get());
+                assertTrue(removeChatMsg.get());
             }
         });
+        assertTrue(newChat.get());
+        assertTrue(updateChat.get());
+        assertTrue(removeChat.get());
+        assertTrue(newMessage.get());
+        assertTrue(updateMessage.get());
+        assertTrue(removeMessage.get());
     }
 }

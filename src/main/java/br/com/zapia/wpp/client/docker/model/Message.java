@@ -9,6 +9,7 @@ import java.util.concurrent.CompletableFuture;
 public class Message extends WhatsAppObjectWithId {
 
     private Contact contact;
+    private String oldId;
 
     protected Message(WhatsAppClient client, JsonNode jsonNode) {
         super(client, jsonNode);
@@ -16,7 +17,8 @@ public class Message extends WhatsAppObjectWithId {
     }
 
     public static Message build(WhatsAppClient client, JsonNode jsonNode) {
-        switch (jsonNode.get("type").textValue()) {
+        String type = jsonNode.get("type") == null ? "" : jsonNode.get("type").asText();
+        switch (type) {
             case "image":
             case "sticker":
             case "video":
@@ -35,12 +37,24 @@ public class Message extends WhatsAppObjectWithId {
         }
     }
 
+    public String getOldId() {
+        return oldId;
+    }
+
     public Contact getContact() {
         return contact;
     }
 
+    public String getBody() {
+        return getJsonNode().get("body") == null ? "" : getJsonNode().get("body").asText();
+    }
+
     public String getType() {
-        return getJsonNode().get("type").textValue();
+        return getJsonNode().get("type") == null ? "" : getJsonNode().get("type").asText();
+    }
+
+    public boolean isNew() {
+        return getJsonNode().get("isNew") != null && getJsonNode().get("isNew").asBoolean(false);
     }
 
     public boolean isRevoked() {
@@ -79,5 +93,13 @@ public class Message extends WhatsAppObjectWithId {
     protected void setJsonNode(JsonNode jsonNode) {
         super.setJsonNode(jsonNode);
         this.contact = new Contact(getClient(), jsonNode.get("senderObj"));
+        JsonNode oldId = jsonNode.get("oldId");
+        if (oldId != null) {
+            if (oldId.get("_serialized") != null) {
+                this.oldId = oldId.get("_serialized").asText();
+            } else {
+                this.oldId = oldId.asText();
+            }
+        }
     }
 }

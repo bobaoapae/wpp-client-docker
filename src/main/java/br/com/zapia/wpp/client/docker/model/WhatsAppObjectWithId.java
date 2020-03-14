@@ -35,10 +35,12 @@ public class WhatsAppObjectWithId {
     protected void setJsonNode(JsonNode jsonNode) {
         this.jsonNode = jsonNode;
         JsonNode id = jsonNode.get("id");
-        if (id.get("_serialized") != null) {
-            this.id = id.get("_serialized").asText();
-        } else {
-            this.id = id.asText();
+        if (id != null) {
+            if (id.get("_serialized") != null) {
+                this.id = id.get("_serialized").asText();
+            } else {
+                this.id = id.asText();
+            }
         }
     }
 

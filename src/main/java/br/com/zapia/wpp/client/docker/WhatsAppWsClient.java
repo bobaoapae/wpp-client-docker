@@ -1,17 +1,21 @@
 package br.com.zapia.wpp.client.docker;
 
+import br.com.zapia.wpp.api.model.payloads.AddChatMessageListenerRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.api.model.payloads.WebSocketResponse;
 import br.com.zapia.wpp.client.docker.model.Chat;
 import br.com.zapia.wpp.client.docker.model.DriverState;
+import br.com.zapia.wpp.client.docker.model.EventType;
 import br.com.zapia.wpp.client.docker.model.Message;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -21,7 +25,8 @@ import java.util.function.Function;
 
 class WhatsAppWsClient extends WebSocketClient {
 
-    private Map<UUID, CompletableFuture<WebSocketResponse>> wsEvents;
+    private Map<UUID, WsMessageSend> wsEvents;
+    private Map<UUID, Consumer<Message>> chatsMessageListener;
     private ObjectMapper objectMapper;
     private boolean waitingInit;
 
@@ -34,6 +39,7 @@ class WhatsAppWsClient extends WebSocketClient {
     private Function<Callable, Callable> callableFactory;
     private Function<Runnable, Thread> threadFactory;
     private ExecutorService executorService;
+    private ScheduledExecutorService scheduledExecutorService;
 
     private List<Consumer<Chat>> newChatListeners;
     private List<Consumer<Chat>> updateChatListeners;
@@ -42,10 +48,11 @@ class WhatsAppWsClient extends WebSocketClient {
     private List<Consumer<Message>> updateMessageListeners;
     private List<Consumer<Message>> removeMessageListeners;
 
-    public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService) {
+    public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
         super(serverUri);
-        wsEvents = new ConcurrentHashMap<>();
-        objectMapper = new ObjectMapper();
+        this.wsEvents = new ConcurrentHashMap<>();
+        this.chatsMessageListener = new ConcurrentHashMap<>();
+        this.objectMapper = new ObjectMapper();
         this.onInit = onInit;
         this.whatsAppClient = whatsAppClient;
         this.onNeedQrCode = onNeedQrCode;
@@ -55,6 +62,7 @@ class WhatsAppWsClient extends WebSocketClient {
         this.callableFactory = callableFactory;
         this.threadFactory = threadFactory;
         this.executorService = executorService;
+        this.scheduledExecutorService = scheduledExecutorService;
         this.newChatListeners = new CopyOnWriteArrayList<>();
         this.updateChatListeners = new CopyOnWriteArrayList<>();
         this.removeChatListeners = new CopyOnWriteArrayList<>();
@@ -64,15 +72,22 @@ class WhatsAppWsClient extends WebSocketClient {
     }
 
     public CompletableFuture<WebSocketResponse> sendWsMessage(WebSocketRequestPayLoad payload) {
+        return sendWsMessage(new WsMessageSend(payload, new CompletableFuture<>()));
+    }
+
+    private CompletableFuture<WebSocketResponse> sendWsMessage(WsMessageSend wsMessageSend) {
         try {
             UUID uuid = UUID.randomUUID();
             WebSocketRequest webSocketRequest = new WebSocketRequest();
             webSocketRequest.setTag(uuid.toString());
-            webSocketRequest.setWebSocketRequestPayLoad(payload);
+            if (wsMessageSend.getPayLoad().getPayload() != null && !(wsMessageSend.getPayLoad().getPayload() instanceof String)) {
+                wsMessageSend.getPayLoad().setPayload(objectMapper.writeValueAsString(wsMessageSend.getPayLoad().getPayload()));
+            }
+            webSocketRequest.setWebSocketRequestPayLoad(wsMessageSend.getPayLoad());
             String serialized = objectMapper.writeValueAsString(webSocketRequest);
             send(serialized);
-            CompletableFuture<WebSocketResponse> response = new CompletableFuture<>();
-            wsEvents.put(uuid, response);
+            CompletableFuture<WebSocketResponse> response = wsMessageSend.getWsEvent();
+            wsEvents.put(uuid, new WsMessageSend(wsMessageSend.getPayLoad(), response, wsMessageSend.getTries()));
             return response;
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
@@ -82,11 +97,38 @@ class WhatsAppWsClient extends WebSocketClient {
     private void processWsResponse(String tag, String payload) {
         UUID uuid = UUID.fromString(tag);
         if (wsEvents.containsKey(uuid)) {
-            CompletableFuture<WebSocketResponse> webSocketResponseCompletableFuture = wsEvents.remove(uuid);
+            WsMessageSend wsMessageSend = wsEvents.remove(uuid);
             try {
-                webSocketResponseCompletableFuture.complete(objectMapper.readValue(payload, WebSocketResponse.class));
+                WebSocketResponse response = objectMapper.readValue(payload, WebSocketResponse.class);
+                if (response.getResponse() instanceof LinkedHashMap) {
+                    response.setResponse(objectMapper.readTree(objectMapper.writeValueAsString(response.getResponse())));
+                } else if (response.getResponse() instanceof String) {
+                    try {
+                        JsonNode jsonNode = objectMapper.readTree((String) response.getResponse());
+                        response.setResponse(jsonNode);
+                    } catch (Exception e) {
+
+                    }
+                }
+                if (response.getStatus() == 200 || response.getStatus() == 201) {
+                    wsMessageSend.getWsEvent().complete(response);
+                } else if ((response.getStatus() == 500 || response.getStatus() == 424 || response.getStatus() == 429) && wsMessageSend.getTries() < 3) {
+                    wsMessageSend.setTries(wsMessageSend.getTries() + 1);
+                    onError(new RuntimeException("Response for event {" + wsMessageSend.getPayLoad().getEvent() + "} with tag {" + tag + "} failed with status {" + response.getStatus() + "}, command will be send again in 1 minute, tries remain {" + (3 - wsMessageSend.getTries()) + "}"));
+                    scheduledExecutorService.schedule(() -> {
+                        sendWsMessage(wsMessageSend);
+                    }, 1, TimeUnit.MINUTES);
+                } else {
+                    wsMessageSend.getWsEvent().completeExceptionally(new RuntimeException("Event {" + wsMessageSend.getPayLoad().getEvent() + "} with tag {" + tag + "} failed with status {" + response.getStatus() + "} and message {" + response.getResponse() + "}"));
+                }
             } catch (IOException e) {
-                webSocketResponseCompletableFuture.completeExceptionally(e);
+                wsMessageSend.getWsEvent().completeExceptionally(e);
+            }
+        } else if (chatsMessageListener.containsKey(uuid)) {
+            try {
+                chatsMessageListener.get(uuid).accept(Message.build(whatsAppClient, objectMapper.readTree(payload)));
+            } catch (IOException e) {
+                onError(new RuntimeException(e));
             }
         }
     }
@@ -113,6 +155,29 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public void addRemoveMessageListener(Consumer<Message> messageConsumer) {
         this.removeMessageListeners.add(messageConsumer);
+    }
+
+    public CompletableFuture<Boolean> addChatMessageListener(String chatId, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        return addChatMessageListener(chatId, false, messageConsumer, eventType, properties);
+    }
+
+    public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("addChatMessageListener");
+        AddChatMessageListenerRequest request = new AddChatMessageListenerRequest();
+        request.setChatId(chatId);
+        request.setIncludeMe(includeMe);
+        request.setEventType(eventType.name());
+        request.setProperties(properties);
+        payLoad.setPayload(request);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            if (webSocketResponse.getStatus() == 200) {
+                this.chatsMessageListener.put(UUID.fromString((String) webSocketResponse.getResponse()), messageConsumer);
+                return true;
+            } else {
+                return false;
+            }
+        });
     }
 
 
@@ -221,7 +286,9 @@ class WhatsAppWsClient extends WebSocketClient {
                 }));
                 break;
             default:
-                processWsResponse(split[0], split[1]);
+                executorService.submit(runnableFactory.apply(() -> {
+                    processWsResponse(split[0], split[1]);
+                }));
                 break;
         }
     }
@@ -236,5 +303,47 @@ class WhatsAppWsClient extends WebSocketClient {
         executorService.submit(runnableFactory.apply(() -> {
             onError.accept(e);
         }));
+    }
+
+    private class WsMessageSend {
+
+        private WebSocketRequestPayLoad payLoad;
+        private CompletableFuture<WebSocketResponse> wsEvent;
+        private int tries;
+
+        public WsMessageSend() {
+        }
+
+        public WsMessageSend(WebSocketRequestPayLoad payLoad) {
+            this.payLoad = payLoad;
+        }
+
+        public WsMessageSend(WebSocketRequestPayLoad payLoad, CompletableFuture<WebSocketResponse> wsEvent) {
+            this.payLoad = payLoad;
+            this.wsEvent = wsEvent;
+        }
+
+        public WsMessageSend(WebSocketRequestPayLoad payLoad, CompletableFuture<WebSocketResponse> wsEvent, int tries) {
+            this.payLoad = payLoad;
+            this.wsEvent = wsEvent;
+            this.tries = tries;
+        }
+
+        public WebSocketRequestPayLoad getPayLoad() {
+            return payLoad;
+        }
+
+        public CompletableFuture<WebSocketResponse> getWsEvent() {
+            return wsEvent;
+        }
+
+        public int getTries() {
+            return tries;
+        }
+
+        public WsMessageSend setTries(int tries) {
+            this.tries = tries;
+            return this;
+        }
     }
 }

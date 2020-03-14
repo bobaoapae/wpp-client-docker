@@ -4,10 +4,8 @@ import br.com.zapia.wpp.api.model.payloads.DeleteMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.api.model.payloads.WebSocketResponse;
-import br.com.zapia.wpp.client.docker.model.Chat;
-import br.com.zapia.wpp.client.docker.model.DriverState;
-import br.com.zapia.wpp.client.docker.model.MediaMessage;
-import br.com.zapia.wpp.client.docker.model.Message;
+import br.com.zapia.wpp.client.docker.model.*;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
@@ -25,10 +23,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -47,6 +42,7 @@ public class WhatsAppClient {
     private Function<Callable, Callable> callableFactory;
     private Function<Runnable, Thread> threadFactory;
     private ExecutorService executorService;
+    private ScheduledExecutorService scheduledExecutorService;
 
     private WhatsAppWsClient whatsAppWsClient;
     private String identity;
@@ -77,6 +73,7 @@ public class WhatsAppClient {
         this.dockerClient = DockerClientBuilder.getInstance(config)
                 .build();
         this.executorService = Executors.newCachedThreadPool(r -> threadFactory.apply(r));
+        this.scheduledExecutorService = Executors.newScheduledThreadPool(20, r -> threadFactory.apply(r));
         this.objectMapper = new ObjectMapper();
         this.chatsAutoUpdate = new ConcurrentHashMap<>();
         this.messagesAutoUpdate = new ConcurrentHashMap<>();
@@ -98,6 +95,12 @@ public class WhatsAppClient {
                     message1.update(message);
                 }
             }
+            if (messagesAutoUpdate.containsKey(message.getOldId())) {
+                List<Message> messages = messagesAutoUpdate.get(message.getOldId());
+                for (Message message1 : messages) {
+                    message1.update(message);
+                }
+            }
         });
     }
 
@@ -112,12 +115,14 @@ public class WhatsAppClient {
                 if (containerResult.size() == 1) {
                     containerId = containerResult.get(0).getId();
                     if (dockerClient.inspectContainerCmd(containerId).exec().getState().getRunning()) {
-                        dockerClient.killContainerCmd(containerId).exec();
+                        dockerClient.stopContainerCmd(containerId).withTimeout(30).exec();
                     }
                 } else {
                     CreateContainerCmd containerCmd = dockerClient.createContainerCmd("whatsapp-api");
                     containerCmd.withName(identity);
-                    containerCmd.withHostConfig(HostConfig.newHostConfig().withPublishAllPorts(true));
+                    containerCmd.withHostConfig(HostConfig.newHostConfig()
+                            .withPublishAllPorts(true)
+                            .withMemory(1024L * 1024L * 700L));
                     CreateContainerResponse exec = containerCmd.exec();
                     containerId = exec.getId();
                 }
@@ -138,7 +143,7 @@ public class WhatsAppClient {
                     boolean flag;
                     int tries = 0;
                     do {
-                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://localhost:" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, runnableFactory, callableFactory, threadFactory, executorService);
+                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://localhost:" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService);
                         flag = whatsAppWsClient.connectBlocking(1, TimeUnit.MINUTES);
                         tries++;
                         Thread.sleep(100);
@@ -196,17 +201,21 @@ public class WhatsAppClient {
         whatsAppWsClient.addRemoveMessageListener(messageConsumer);
     }
 
+    public CompletableFuture<Boolean> addChatMessageListener(String chatId, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        return addChatMessageListener(chatId, false, messageConsumer, eventType, properties);
+    }
+
+    public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        return whatsAppWsClient.addChatMessageListener(chatId, includeMe, messageConsumer, eventType, properties);
+    }
+
     public CompletableFuture<Chat> findChatById(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent("findChat");
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                try {
-                    return Chat.build(this, objectMapper.readTree(objectMapper.writeValueAsString(webSocketResponse.getResponse())));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                return Chat.build(this, (JsonNode) webSocketResponse.getResponse());
             } else {
                 return null;
             }
@@ -219,11 +228,7 @@ public class WhatsAppClient {
         payLoad.setPayload(number);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                try {
-                    return Chat.build(this, objectMapper.readTree(objectMapper.writeValueAsString(webSocketResponse.getResponse())));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                return Chat.build(this, (JsonNode) webSocketResponse.getResponse());
             } else {
                 return null;
             }
@@ -236,11 +241,7 @@ public class WhatsAppClient {
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                try {
-                    return Message.build(this, objectMapper.readTree(objectMapper.writeValueAsString(webSocketResponse.getResponse())));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                return Message.build(this, (JsonNode) webSocketResponse.getResponse());
             } else {
                 return null;
             }
@@ -299,14 +300,89 @@ public class WhatsAppClient {
         payLoad.setPayload(sendMessageRequest);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                try {
-                    return Message.build(this, objectMapper.readTree(objectMapper.writeValueAsString(webSocketResponse.getResponse())));
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                return Message.build(this, (JsonNode) webSocketResponse.getResponse());
             } else {
                 throw new RuntimeException(String.valueOf(webSocketResponse.getStatus()));
             }
+        });
+    }
+
+    public CompletableFuture<Boolean> seeChat(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("seeChat");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> pinChat(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("pinChat");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> unPinChat(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("unPinChat");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> markChatComposing(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("markComposing");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> markChatPaused(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("markPaused");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> markChatRecording(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("markRecording");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> subscribeChatPresence(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("subscribePresence");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<List<Message>> loadEarlyMessagesChat(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("loadEarly");
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            List<Message> messages = new ArrayList<>();
+            if (webSocketResponse.getStatus() == 200) {
+                JsonNode jsonNode = (JsonNode) webSocketResponse.getResponse();
+                for (JsonNode node : jsonNode) {
+                    messages.add(Message.build(this, node));
+                }
+            }
+            return messages;
         });
     }
 
@@ -315,7 +391,7 @@ public class WhatsAppClient {
         payLoad.setEvent("deleteChat");
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            return webSocketResponse.getStatus() == 200;
+            return webSocketResponse.getStatus() == 200 || webSocketResponse.getStatus() == 404;
         });
     }
 
@@ -327,7 +403,7 @@ public class WhatsAppClient {
         payLoad.setEvent("deleteMessage");
         payLoad.setPayload(deleteMessageRequest);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            return webSocketResponse.getStatus() == 200;
+            return webSocketResponse.getStatus() == 200 || webSocketResponse.getStatus() == 404;
         });
     }
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 public class Chat extends WhatsAppObjectWithId {
 
@@ -81,8 +82,48 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().sendMessage(sendMessageRequest);
     }
 
+    public CompletableFuture<Boolean> sendSee() {
+        return getClient().seeChat(getId());
+    }
+
+    public CompletableFuture<Boolean> markComposing() {
+        return getClient().markChatComposing(getId());
+    }
+
+    public CompletableFuture<Boolean> markRecording() {
+        return getClient().markChatRecording(getId());
+    }
+
+    public CompletableFuture<Boolean> markPaused() {
+        return getClient().markChatPaused(getId());
+    }
+
+    public CompletableFuture<Boolean> subscribePresence() {
+        return getClient().subscribeChatPresence(getId());
+    }
+
+    public CompletableFuture<Boolean> pinChat() {
+        return getClient().pinChat(getId());
+    }
+
+    public CompletableFuture<Boolean> unPinChat() {
+        return getClient().unPinChat(getId());
+    }
+
+    public CompletableFuture<List<Message>> loadEarly() {
+        return getClient().loadEarlyMessagesChat(getId());
+    }
+
     public CompletableFuture<Boolean> delete() {
         return getClient().deleteChat(getId());
+    }
+
+    public CompletableFuture<Boolean> addMessageListener(Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        return addMessageListener(false, messageConsumer, eventType, properties);
+    }
+
+    public CompletableFuture<Boolean> addMessageListener(boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+        return getClient().addChatMessageListener(getId(), includeMe, messageConsumer, eventType, properties);
     }
 
     public CompletableFuture<Void> update() {
