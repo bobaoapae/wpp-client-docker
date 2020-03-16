@@ -73,8 +73,16 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().sendMessage(getId(), file, caption);
     }
 
+    public CompletableFuture<MediaMessage> sendMessage(File file, String fileName, String caption) {
+        return getClient().sendMessage(getId(), "", file, fileName, caption);
+    }
+
     public CompletableFuture<MediaMessage> sendMessage(String quotedMsgId, File file, String caption) {
         return getClient().sendMessage(getId(), quotedMsgId, file, caption);
+    }
+
+    public CompletableFuture<MediaMessage> sendMessage(String quotedMsgId, File file, String fileName, String caption) {
+        return getClient().sendMessage(getId(), quotedMsgId, file, fileName, caption);
     }
 
     public CompletableFuture<Message> sendMessage(SendMessageRequest sendMessageRequest) {

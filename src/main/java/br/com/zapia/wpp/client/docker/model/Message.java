@@ -73,6 +73,10 @@ public class Message extends WhatsAppObjectWithId {
         return getClient().sendMessage(getContact().getId(), getId(), file, caption);
     }
 
+    public CompletableFuture<MediaMessage> reply(File file, String fileName, String caption) {
+        return getClient().sendMessage(getContact().getId(), getId(), file, fileName, caption);
+    }
+
     public CompletableFuture<Boolean> delete() {
         return getClient().deleteMessage(getId(), false);
     }

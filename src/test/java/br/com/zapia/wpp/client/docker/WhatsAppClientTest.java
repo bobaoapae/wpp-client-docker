@@ -1,9 +1,6 @@
 package br.com.zapia.wpp.client.docker;
 
-import br.com.zapia.wpp.client.docker.model.Chat;
-import br.com.zapia.wpp.client.docker.model.DriverState;
-import br.com.zapia.wpp.client.docker.model.EventType;
-import br.com.zapia.wpp.client.docker.model.Message;
+import br.com.zapia.wpp.client.docker.model.*;
 import org.junit.jupiter.api.Test;
 
 import javax.imageio.ImageIO;
@@ -11,6 +8,7 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -111,7 +109,12 @@ class WhatsAppClientTest {
         builder.onInit(onInit)
                 .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
-                .onNeedQrCode(onNeedQrCode);
+                .onNeedQrCode(onNeedQrCode)
+                .onWsDisconnect((code, reason, remote) -> {
+                    if (remote) {
+                        assertTrue(whatsAppClient.start().orTimeout(3, TimeUnit.MINUTES).join());
+                    }
+                });
         whatsAppClient = builder.builder();
         assertTrue(whatsAppClient.start().orTimeout(3, TimeUnit.MINUTES).join());
         assertDoesNotThrow(() -> {
@@ -147,16 +150,51 @@ class WhatsAppClientTest {
                 Thread.sleep(5000);
                 assertTrue(chat.delete().join());
                 Thread.sleep(5000);
+                CompletableFuture<Void> newChatMsg2 = new CompletableFuture<>();
+                CompletableFuture<Void> newChatMsg3 = new CompletableFuture<>();
+                whatsAppClient.addNewChatListener(chat1 -> {
+                    assertDoesNotThrow(() -> {
+                        Message lastMsg = chat1.getLastMsg();
+                        assertNotNull(lastMsg);
+                        assertEquals("teste", lastMsg.getBody());
+                        MediaMessage caption = lastMsg.reply(new File("pom.xml"), "caption").join();
+                        assertNotNull(caption);
+                        assertEquals("caption", caption.getCaption());
+                        chat1.addMessageListener(message1 -> {
+                            if (message1 instanceof MediaMessage) {
+                                File join = ((MediaMessage) message1).download().join();
+                                assertNotNull(join);
+                                MediaMessage join1 = message1.reply(join, join.getName().split("#")[0], "").join();
+                                assertNotNull(join1);
+                                newChatMsg3.complete(null);
+                            } else {
+                                assertEquals("teste", message1.getBody());
+                                Message join = message1.reply("Envie um arquivo para testar o download").join();
+                                assertNotNull(join);
+                                assertEquals("Envie um arquivo para testar o download", join.getBody());
+                                newChatMsg2.complete(null);
+                            }
+                        }, EventType.ADD);
+                    });
+                });
+                assertDoesNotThrow(() -> {
+                    newChatMsg2.get(3, TimeUnit.MINUTES);
+                    newChatMsg3.get(3, TimeUnit.MINUTES);
+                });
+                assertTrue(whatsAppClient.getAllChats().join().size() >= 1);
+                assertTrue(whatsAppClient.getAllContacts().join().size() >= 1);
+                assertTrue(chat.delete().join());
+                Thread.sleep(5000);
                 assertTrue(newChatMsg.get());
                 assertTrue(updateChatMsg.get());
                 assertTrue(removeChatMsg.get());
+                assertTrue(newChat.get());
+                assertTrue(updateChat.get());
+                assertTrue(removeChat.get());
+                assertTrue(newMessage.get());
+                assertTrue(updateMessage.get());
+                assertTrue(removeMessage.get());
             }
         });
-        assertTrue(newChat.get());
-        assertTrue(updateChat.get());
-        assertTrue(removeChat.get());
-        assertTrue(newMessage.get());
-        assertTrue(updateMessage.get());
-        assertTrue(removeMessage.get());
     }
 }

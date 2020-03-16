@@ -4,7 +4,9 @@ import br.com.zapia.wpp.client.docker.WhatsAppClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import javax.swing.text.MaskFormatter;
+import java.io.File;
 import java.text.ParseException;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,6 +39,14 @@ public class Contact extends WhatsAppObjectWithId {
         phoneNumber = phoneTemp;
     }
 
+    public CompletableFuture<File> getProfilePic() {
+        return getProfilePic(false);
+    }
+
+    public CompletableFuture<File> getProfilePic(boolean full) {
+        return getClient().getProfilePic(getId(), full);
+    }
+
     public String getSafeName() {
         if (getPushName() != null) {
             return getPushName();
@@ -58,7 +68,7 @@ public class Contact extends WhatsAppObjectWithId {
     }
 
     public String getShortName() {
-        if (getJsonNode().get("shortName") != null && getJsonNode().get("shortName").isTextual()) {
+        if (getJsonNode().hasNonNull("shortName") && getJsonNode().get("shortName").isTextual()) {
             return getJsonNode().get("shortName").asText();
         } else {
             return null;
@@ -66,7 +76,7 @@ public class Contact extends WhatsAppObjectWithId {
     }
 
     public String getName() {
-        if (getJsonNode().get("name") != null && getJsonNode().get("name").isTextual()) {
+        if (getJsonNode().hasNonNull("name") && getJsonNode().get("name").isTextual()) {
             return getJsonNode().get("name").asText();
         } else {
             return null;
@@ -74,7 +84,7 @@ public class Contact extends WhatsAppObjectWithId {
     }
 
     public String getPushName() {
-        if (getJsonNode().get("pushname") != null && getJsonNode().get("pushname").isTextual()) {
+        if (getJsonNode().hasNonNull("pushname") && getJsonNode().get("pushname").isTextual()) {
             return getJsonNode().get("pushname").asText();
         } else {
             return null;
@@ -82,7 +92,7 @@ public class Contact extends WhatsAppObjectWithId {
     }
 
     public String getFormattedName() {
-        if (getJsonNode().get("formattedName") != null && getJsonNode().get("formattedName").isTextual()) {
+        if (getJsonNode().hasNonNull("formattedName") && getJsonNode().get("formattedName").isTextual()) {
             return getJsonNode().get("formattedName").asText();
         } else {
             return null;
