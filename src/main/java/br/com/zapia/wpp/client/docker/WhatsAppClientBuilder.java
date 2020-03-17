@@ -14,6 +14,8 @@ public class WhatsAppClientBuilder {
     private static Logger logger = Logger.getLogger(WhatsAppClient.class.getName());
 
     private String dockerEndPoint;
+    private int dockerPort;
+    private boolean useTls;
     private String identity;
     private Runnable onInit;
     private Consumer<String> onNeedQrCode;
@@ -26,8 +28,10 @@ public class WhatsAppClientBuilder {
     private Function<Callable, Callable> callableFactory;
     private Function<Runnable, Thread> threadFactory;
 
-    public WhatsAppClientBuilder(String dockerEndPoint, String identity) {
+    public WhatsAppClientBuilder(String dockerEndPoint, int dockerPort, boolean useTls, String identity) {
         this.dockerEndPoint = dockerEndPoint;
+        this.dockerPort = dockerPort;
+        this.useTls = useTls;
         this.identity = identity;
         this.onInit = () -> {
             logger.log(Level.INFO, "init");
@@ -106,6 +110,6 @@ public class WhatsAppClientBuilder {
     }
 
     public WhatsAppClient builder() {
-        return new WhatsAppClient(dockerEndPoint, identity, onInit, onNeedQrCode, onUpdateDriverState, onError, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
+        return new WhatsAppClient(dockerEndPoint, dockerPort, useTls, identity, onInit, onNeedQrCode, onUpdateDriverState, onError, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
     }
 }

@@ -2,16 +2,14 @@ package br.com.zapia.wpp.client.docker;
 
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
+import br.com.zapia.wpp.client.docker.model.EventType;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.github.dockerjava.api.model.Container;
-import com.github.dockerjava.api.model.ExposedPort;
-import com.github.dockerjava.api.model.HostConfig;
-import com.github.dockerjava.api.model.Ports;
+import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.DockerClientConfig;
@@ -56,7 +54,7 @@ public class WhatsAppClient {
     private Map<String, List<Chat>> chatsAutoUpdate;
     private Map<String, List<Message>> messagesAutoUpdate;
 
-    public WhatsAppClient(String dockerEndPoint, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
+    public WhatsAppClient(String dockerEndPoint, int dockerPort, boolean useTls, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.identity = identity;
         this.onInit = () -> {
             onInit();
@@ -76,8 +74,8 @@ public class WhatsAppClient {
         this.callableFactory = callableFactory;
         this.threadFactory = threadFactory;
         this.config = DefaultDockerClientConfig.createDefaultConfigBuilder()
-                .withDockerHost("tcp://" + dockerEndPoint + ":2375")
-                .withDockerTlsVerify(false)
+                .withDockerHost("tcp://" + dockerEndPoint + ":" + dockerPort)
+                .withDockerTlsVerify(useTls)
                 .build();
         this.dockerClient = DockerClientBuilder.getInstance(config)
                 .build();
@@ -134,30 +132,40 @@ public class WhatsAppClient {
             try {
                 List<Container> containerResult = dockerClient.listContainersCmd()
                         .withShowAll(true)
-                        .withNameFilter(Arrays.asList(identity))
+                        .withNameFilter(Arrays.asList("whatsapp-api-" + identity))
                         .exec();
                 String containerId;
-                if (containerResult.size() == 1) {
-                    containerId = containerResult.get(0).getId();
-                    if (dockerClient.inspectContainerCmd(containerId).exec().getState().getRunning()) {
-                        dockerClient.stopContainerCmd(containerId).withTimeout(30).exec();
+                InspectContainerResponse inspect;
+                try {
+                    if (containerResult.size() == 1) {
+                        containerId = containerResult.get(0).getId();
+                        inspect = dockerClient.inspectContainerCmd(containerId).exec();
+                        if (inspect.getState().getRunning()) {
+                            dockerClient.stopContainerCmd(containerId).exec();
+                        }
+                        dockerClient.removeContainerCmd(containerId).withForce(true).exec();
                     }
-                } else {
-                    CreateContainerCmd containerCmd = dockerClient.createContainerCmd("whatsapp-api");
-                    containerCmd.withName(identity);
-                    containerCmd.withHostConfig(HostConfig.newHostConfig()
-                            .withPublishAllPorts(true)
-                            .withMemory(1024L * 1024L * 700L));
-                    CreateContainerResponse exec = containerCmd.exec();
-                    containerId = exec.getId();
+                } catch (Exception ignore) {
+
                 }
-                InspectContainerResponse exec = dockerClient.inspectContainerCmd(containerId).exec();
-                if (!exec.getState().getRunning()) {
-                    dockerClient.startContainerCmd(containerId).exec();
-                }
+                Volume chromeCache = new Volume("/cache");
+                Volume chromeBinaries = new Volume("/binaries");
+                CreateContainerCmd containerCmd = dockerClient.createContainerCmd("bobaoapae/whatsapp-api:latest");
+                containerCmd.withName("whatsapp-api-" + identity);
+                containerCmd.withHostConfig(HostConfig.newHostConfig()
+                        .withPublishAllPorts(true)
+                        .withMemory(1024L * 1024L * 700L)
+                        .withMemoryReservation(1024L * 1024L * 300L)
+                        .withCpuPercent(5L)
+                        .withAutoRemove(true)
+                        .withBinds(new Bind(new File("").getAbsolutePath() + "/caches/" + identity, chromeCache), new Bind(new File("").getAbsolutePath() + "/binaries/" + identity, chromeBinaries)))
+                        .withVolumes(chromeCache, chromeBinaries);
+                CreateContainerResponse exec = containerCmd.exec();
+                containerId = exec.getId();
+                dockerClient.startContainerCmd(containerId).exec();
                 dockerClient.waitContainerCmd(containerId);
-                exec = dockerClient.inspectContainerCmd(containerId).exec();
-                Map<ExposedPort, Ports.Binding[]> bindings = exec.getNetworkSettings().getPorts().getBindings();
+                inspect = dockerClient.inspectContainerCmd(containerId).exec();
+                Map<ExposedPort, Ports.Binding[]> bindings = inspect.getNetworkSettings().getPorts().getBindings();
                 localPort = "";
                 for (Map.Entry<ExposedPort, Ports.Binding[]> exposedPortEntry : bindings.entrySet()) {
                     if (exposedPortEntry.getKey().getPort() == 1100) {
@@ -171,7 +179,9 @@ public class WhatsAppClient {
                     Map<UUID, WhatsAppWsClient.WsMessageSend> wsEvents = null;
                     do {
                         if (whatsAppWsClient != null) {
-                            wsEvents = whatsAppWsClient.getWsEvents();
+                            if (!whatsAppWsClient.getWsEvents().isEmpty()) {
+                                wsEvents = whatsAppWsClient.getWsEvents();
+                            }
                             if (!whatsAppWsClient.isClosed() && !whatsAppWsClient.isClosing()) {
                                 whatsAppWsClient.close();
                             }
@@ -180,7 +190,7 @@ public class WhatsAppClient {
                         flag = whatsAppWsClient.connectBlocking(1, TimeUnit.MINUTES);
                         tries++;
                         Thread.sleep(100);
-                    } while (!flag && tries <= 600);
+                    } while (!flag && tries <= 1200);
                     this.successConnect = flag;
                     if (flag && wsEvents != null && !wsEvents.isEmpty()) {
                         for (WhatsAppWsClient.WsMessageSend value : wsEvents.values()) {

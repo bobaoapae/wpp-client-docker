@@ -105,7 +105,7 @@ class WhatsAppClientTest {
         };
 
 
-        WhatsAppClientBuilder builder = new WhatsAppClientBuilder("localhost", "teste");
+        WhatsAppClientBuilder builder = new WhatsAppClientBuilder("localhost", 2375, false, "teste");
         builder.onInit(onInit)
                 .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
@@ -181,6 +181,12 @@ class WhatsAppClientTest {
                     newChatMsg2.get(3, TimeUnit.MINUTES);
                     newChatMsg3.get(3, TimeUnit.MINUTES);
                 });
+                File profilePic = chat.getContact().getProfilePic().join();
+                File profilePicFull = chat.getContact().getProfilePic(true).join();
+                assertNotNull(profilePic);
+                assertNotNull(profilePicFull);
+                assertNotNull(chat.sendMessage(profilePic, "Foto de Perfil").join());
+                assertNotNull(chat.sendMessage(profilePicFull, "Foto de Perfil Full").join());
                 assertTrue(whatsAppClient.getAllChats().join().size() >= 1);
                 assertTrue(whatsAppClient.getAllContacts().join().size() >= 1);
                 assertTrue(chat.delete().join());
