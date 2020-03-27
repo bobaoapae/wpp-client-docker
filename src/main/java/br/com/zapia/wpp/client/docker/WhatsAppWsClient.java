@@ -4,6 +4,8 @@ import br.com.zapia.wpp.api.model.payloads.*;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.*;
+import org.apache.tika.Tika;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -336,6 +338,49 @@ class WhatsAppWsClient extends WebSocketClient {
                 fileOutputStream.close();
                 readableByteChannel.close();
                 completableFuture.complete(tempFile);
+            } catch (Exception e) {
+                completableFuture.completeExceptionally(e);
+            }
+        });
+        return completableFuture;
+    }
+
+    public CompletableFuture<String> uploadFile(String name, String base64) {
+        byte[] dearr = Base64.getDecoder().decode(base64);
+        try {
+            File f = File.createTempFile(name, ".tmp");
+            try (FileOutputStream fos = new FileOutputStream(f)) {
+                fos.write(dearr);
+            }
+            return uploadFile(name, f);
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    public CompletableFuture<String> uploadFile(String name, File file) {
+        CompletableFuture<String> completableFuture = new CompletableFuture<>();
+        executorService.submit(() -> {
+            try {
+                OkHttpClient client = new OkHttpClient();
+                RequestBody formBody = new MultipartBody.Builder()
+                        .setType(MultipartBody.FORM)
+                        .addFormDataPart("file", name,
+                                RequestBody.create(file, MediaType.parse(new Tika().detect(file))))
+                        .build();
+
+                int port = getConnection().getRemoteSocketAddress().getPort();
+
+
+                Request request = new Request.Builder().url("http://localhost:" + port + "/api/uploadFile/").post(formBody).build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) {
+                        completableFuture.completeExceptionally(new RuntimeException(response.body().string()));
+                    } else {
+                        completableFuture.complete(response.body().string());
+                    }
+                }
             } catch (Exception e) {
                 completableFuture.completeExceptionally(e);
             }

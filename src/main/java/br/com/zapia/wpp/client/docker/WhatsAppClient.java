@@ -15,10 +15,11 @@ import com.github.dockerjava.core.DockerClientBuilder;
 import com.github.dockerjava.core.DockerClientConfig;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -154,9 +155,8 @@ public class WhatsAppClient {
                 containerCmd.withName("whatsapp-api-" + identity);
                 containerCmd.withHostConfig(HostConfig.newHostConfig()
                         .withPublishAllPorts(true)
-                        .withMemory(1024L * 1024L * 700L)
+                        .withMemory(1024L * 1024L * 500L)
                         .withMemoryReservation(1024L * 1024L * 300L)
-                        .withCpuPercent(5L)
                         .withAutoRemove(true)
                         .withBinds(new Bind(new File("").getAbsolutePath() + "/caches/" + identity, chromeCache), new Bind(new File("").getAbsolutePath() + "/binaries/" + identity, chromeBinaries)))
                         .withVolumes(chromeCache, chromeBinaries);
@@ -300,29 +300,27 @@ public class WhatsAppClient {
     }
 
     public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, File file, String fileName, String caption) {
-        try {
-            String contentType = Files.probeContentType(file.toPath());
-            byte[] data = Files.readAllBytes(file.toPath());
-            String base64str = Base64.getEncoder().encodeToString(data);
-            StringBuilder sb = new StringBuilder();
-            sb.append("data:");
-            sb.append(contentType);
-            sb.append(";base64,");
-            sb.append(base64str);
-            return sendMessage(chatId, quotedId, sb.toString(), fileName, caption);
-        } catch (IOException e) {
-            return CompletableFuture.failedFuture(e);
-        }
+        return whatsAppWsClient.uploadFile(fileName, file).thenCompose(s -> {
+            return sendMessage(chatId, quotedId, s, caption).thenApply(message -> {
+                return message;
+            });
+        });
     }
 
-
     public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, String fileBase64, String fileName, String caption) {
+        return whatsAppWsClient.uploadFile(fileName, fileBase64).thenCompose(s -> {
+            return sendMessage(chatId, quotedId, s, caption).thenApply(message -> {
+                return message;
+            });
+        });
+    }
+
+    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, String uploadedUUID, String caption) {
         SendMessageRequest sendMessageRequest = new SendMessageRequest();
-        sendMessageRequest.setFileName(fileName);
-        sendMessageRequest.setMedia(fileBase64);
         sendMessageRequest.setMessage(caption);
         sendMessageRequest.setChatId(chatId);
         sendMessageRequest.setQuotedMsg(quotedId);
+        sendMessageRequest.setFileUUID(uploadedUUID);
         return sendMessage(sendMessageRequest).thenApply(message -> {
             return (MediaMessage) message;
         });

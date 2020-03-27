@@ -75,10 +75,15 @@ class WhatsAppClientTest {
             if (label == null) {
                 label = new JLabel("", JLabel.LEFT);
                 label.setPreferredSize(new Dimension(500, 500));
-                JOptionPane.showMessageDialog(
-                        null,
-                        label,
-                        "SCAN QR CODE", JOptionPane.INFORMATION_MESSAGE);
+                try {
+                    JOptionPane.showMessageDialog(
+                            null,
+                            label,
+                            "SCAN QR CODE", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    label = null;
+                }
             }
             if (base64 != null && base64.contains(",")) {
                 try {
