@@ -126,6 +126,10 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().deleteChat(getId());
     }
 
+    public CompletableFuture<Boolean> clearMessages(boolean keepFavorites) {
+        return getClient().clearChatMessages(getId(), keepFavorites);
+    }
+
     public CompletableFuture<Boolean> addMessageListener(Consumer<Message> messageConsumer, EventType eventType, String... properties) {
         return addMessageListener(false, messageConsumer, eventType, properties);
     }

@@ -194,6 +194,10 @@ class WhatsAppClientTest {
                 assertNotNull(chat.sendMessage(profilePicFull, "Foto de Perfil Full").join());
                 assertTrue(whatsAppClient.getAllChats().join().size() >= 1);
                 assertTrue(whatsAppClient.getAllContacts().join().size() >= 1);
+                Thread.sleep(3000);
+                assertTrue(chat.clearMessages(false).join());
+                Thread.sleep(5000);
+                assertTrue(chat.getAllMessages().size() <= 3);
                 assertTrue(chat.delete().join());
                 Thread.sleep(5000);
                 assertTrue(newChatMsg.get());

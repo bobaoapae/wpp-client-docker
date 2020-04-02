@@ -4,7 +4,9 @@ import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.client.docker.model.EventType;
 import br.com.zapia.wpp.client.docker.model.*;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.command.CreateContainerResponse;
@@ -96,6 +98,21 @@ public class WhatsAppClient {
                 }
             }
         });
+        addRemoveMessageListener(message -> {
+            if (chatsAutoUpdate.containsKey(message.getContact().getId())) {
+                List<Chat> chats = chatsAutoUpdate.get(message.getContact().getId());
+                for (Chat chat1 : chats) {
+                    int msgIndex = 0;
+                    for (JsonNode msg : chat1.getJsonNode().get("msgs").deepCopy()) {
+                        Message message1 = Message.build(this, msg);
+                        if (message1.equals(message)) {
+                            ((ArrayNode) chat1.getJsonNode().get("msgs")).remove(msgIndex);
+                        }
+                        msgIndex++;
+                    }
+                }
+            }
+        });
         addUpdateMessageListener(message -> {
             if (messagesAutoUpdate.containsKey(message.getId())) {
                 List<Message> messages = messagesAutoUpdate.get(message.getId());
@@ -150,16 +167,17 @@ public class WhatsAppClient {
 
                 }
                 Volume chromeCache = new Volume("/cache");
-                Volume chromeBinaries = new Volume("/binaries");
                 CreateContainerCmd containerCmd = dockerClient.createContainerCmd("bobaoapae/whatsapp-api:latest");
                 containerCmd.withName("whatsapp-api-" + identity);
                 containerCmd.withHostConfig(HostConfig.newHostConfig()
                         .withPublishAllPorts(true)
                         .withMemory(1024L * 1024L * 500L)
                         .withMemoryReservation(1024L * 1024L * 300L)
+                        .withMemorySwap(1024L * 1024L * 700L)
                         .withAutoRemove(true)
-                        .withBinds(new Bind(new File("").getAbsolutePath() + "/caches/" + identity, chromeCache), new Bind(new File("").getAbsolutePath() + "/binaries/" + identity, chromeBinaries)))
-                        .withVolumes(chromeCache, chromeBinaries);
+                        .withCpuPercent(3L)
+                        .withBinds(new Bind(new File("").getAbsolutePath() + "/caches/" + identity, chromeCache)))
+                        .withVolumes(chromeCache);
                 CreateContainerResponse exec = containerCmd.exec();
                 containerId = exec.getId();
                 dockerClient.startContainerCmd(containerId).exec();
@@ -380,6 +398,10 @@ public class WhatsAppClient {
 
     public CompletableFuture<Boolean> deleteChat(String chatId) {
         return whatsAppWsClient.deleteChat(chatId);
+    }
+
+    public CompletableFuture<Boolean> clearChatMessages(String chatId, boolean keepFavorites) {
+        return whatsAppWsClient.clearChatMessages(chatId, keepFavorites);
     }
 
     public CompletableFuture<Boolean> deleteMessage(String msgId, boolean fromAll) {

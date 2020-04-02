@@ -485,6 +485,19 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<Boolean> clearChatMessages(String chatId, boolean keepFavorites) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("clearChat");
+        ClearChatRequest clearChatRequest = new ClearChatRequest();
+        clearChatRequest.setChatId(chatId);
+        clearChatRequest.setChatId(chatId);
+        clearChatRequest.setKeepFavorites(keepFavorites);
+        payLoad.setPayload(clearChatRequest);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
     public CompletableFuture<Boolean> deleteMessage(String msgId, boolean fromAll) {
         DeleteMessageRequest deleteMessageRequest = new DeleteMessageRequest();
         deleteMessageRequest.setFromAll(fromAll);
