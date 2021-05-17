@@ -169,7 +169,7 @@ class WhatsAppWsClient extends WebSocketClient {
             wsMessageSend.getWsEvent().complete(response);
         } else if ((response.getStatus() == 500 || response.getStatus() == 429) && wsMessageSend.getTries() < 3) {
             wsMessageSend.setTries(wsMessageSend.getTries() + 1);
-            onError(new RuntimeException("Response for event {" + wsMessageSend.getPayLoad().getEvent() + "} failed with status {" + response.getStatus() + "}, command will be send again in 1 minute, tries remain {" + (3 - wsMessageSend.getTries()) + "}"));
+            onError(new RuntimeException("Response for event {" + wsMessageSend.getPayLoad().getEvent() + "} failed with status {" + response.getStatus() + "} and message {" + response.getResponse() + "}, command will be send again in 1 minute, tries remain {" + (3 - wsMessageSend.getTries()) + "}"));
             scheduledExecutorService.schedule(() -> {
                 sendWsMessage(wsMessageSend);
             }, 1, TimeUnit.MINUTES);
