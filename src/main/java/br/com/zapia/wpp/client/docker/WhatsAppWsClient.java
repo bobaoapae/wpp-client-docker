@@ -52,8 +52,11 @@ class WhatsAppWsClient extends WebSocketClient {
     private List<Consumer<Message>> updateMessageListeners;
     private List<Consumer<Message>> removeMessageListeners;
 
+    private String endPointAddress;
+
     public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
         super(serverUri);
+        this.endPointAddress = uri.getHost();
         this.wsEvents = new ConcurrentHashMap<>();
         this.wsPartialEvents = new ConcurrentHashMap<>();
         this.chatsMessageListener = new ConcurrentHashMap<>();
@@ -325,7 +328,7 @@ class WhatsAppWsClient extends WebSocketClient {
         executorService.submit(() -> {
             try {
                 int port = getConnection().getRemoteSocketAddress().getPort();
-                URL url = new URL("http://localhost:" + port + "/api/downloadFile/" + key);
+                URL url = new URL("http://" + endPointAddress + ":" + port + "/api/downloadFile/" + key);
                 URLConnection urlConnection = url.openConnection();
                 String filename = URLDecoder.decode(urlConnection.getHeaderField("Filename"), StandardCharsets.UTF_8);
                 ReadableByteChannel readableByteChannel = Channels.newChannel(urlConnection.getInputStream());
@@ -372,7 +375,7 @@ class WhatsAppWsClient extends WebSocketClient {
                 int port = getConnection().getRemoteSocketAddress().getPort();
 
 
-                Request request = new Request.Builder().url("http://localhost:" + port + "/api/uploadFile/").post(formBody).build();
+                Request request = new Request.Builder().url("http://" + endPointAddress + ":" + port + "/api/uploadFile/").post(formBody).build();
 
                 try (Response response = client.newCall(request).execute()) {
                     if (!response.isSuccessful()) {
