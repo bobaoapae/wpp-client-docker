@@ -46,6 +46,7 @@ public class WhatsAppClient {
     private ScheduledExecutorService scheduledExecutorService;
 
     private WhatsAppWsClient whatsAppWsClient;
+    private String dockerEndPoint;
     private String identity;
     private DockerClientConfig config;
     private DockerClient dockerClient;
@@ -58,6 +59,7 @@ public class WhatsAppClient {
     private Map<String, List<Message>> messagesAutoUpdate;
 
     public WhatsAppClient(String dockerEndPoint, int dockerPort, boolean useTls, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
+        this.dockerEndPoint = dockerEndPoint;
         this.identity = identity;
         this.onInit = () -> {
             onInit();
@@ -166,7 +168,7 @@ public class WhatsAppClient {
                 } catch (Exception ignore) {
 
                 }
-                Volume chromeCache = new Volume("/cache");
+                Volume chromeCache = new Volume("/cacheWhatsApp");
                 CreateContainerCmd containerCmd = dockerClient.createContainerCmd("bobaoapae/whatsapp-api:latest");
                 containerCmd.withName("whatsapp-api-" + identity);
                 containerCmd.withHostConfig(HostConfig.newHostConfig()
@@ -204,7 +206,7 @@ public class WhatsAppClient {
                                 whatsAppWsClient.close();
                             }
                         }
-                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://localhost:" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, onWsConnect, onWsDisconnect, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService);
+                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://"+dockerEndPoint+":" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, onWsConnect, onWsDisconnect, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService);
                         flag = whatsAppWsClient.connectBlocking(1, TimeUnit.MINUTES);
                         tries++;
                         Thread.sleep(100);
