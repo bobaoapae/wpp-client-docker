@@ -27,32 +27,32 @@ import java.util.function.Function;
 
 class WhatsAppWsClient extends WebSocketClient {
 
-    private Map<UUID, WsMessageSend> wsEvents;
-    private Map<UUID, List<WebSocketResponseFrame>> wsPartialEvents;
-    private Map<UUID, Consumer<Message>> chatsMessageListener;
-    private ObjectMapper objectMapper;
+    private final Map<UUID, WsMessageSend> wsEvents;
+    private final Map<UUID, List<WebSocketResponseFrame>> wsPartialEvents;
+    private final Map<UUID, Consumer<Message>> chatsMessageListener;
+    private final ObjectMapper objectMapper;
 
-    private Runnable onInit;
-    private WhatsAppClient whatsAppClient;
-    private Consumer<String> onNeedQrCode;
-    private Consumer<DriverState> onUpdateDriverState;
-    private Consumer<Throwable> onError;
-    private OnWsDisconnect onWsDisconnect;
-    private Runnable onWsConnect;
-    private Function<Runnable, Runnable> runnableFactory;
-    private Function<Callable, Callable> callableFactory;
-    private Function<Runnable, Thread> threadFactory;
-    private ExecutorService executorService;
-    private ScheduledExecutorService scheduledExecutorService;
+    private final Runnable onInit;
+    private final WhatsAppClient whatsAppClient;
+    private final Consumer<String> onNeedQrCode;
+    private final Consumer<DriverState> onUpdateDriverState;
+    private final Consumer<Throwable> onError;
+    private final OnWsDisconnect onWsDisconnect;
+    private final Runnable onWsConnect;
+    private final Function<Runnable, Runnable> runnableFactory;
+    private final Function<Callable, Callable> callableFactory;
+    private final Function<Runnable, Thread> threadFactory;
+    private final ExecutorService executorService;
+    private final ScheduledExecutorService scheduledExecutorService;
 
-    private List<Consumer<Chat>> newChatListeners;
-    private List<Consumer<Chat>> updateChatListeners;
-    private List<Consumer<Chat>> removeChatListeners;
-    private List<Consumer<Message>> newMessageListeners;
-    private List<Consumer<Message>> updateMessageListeners;
-    private List<Consumer<Message>> removeMessageListeners;
+    private final List<Consumer<Chat>> newChatListeners;
+    private final List<Consumer<Chat>> updateChatListeners;
+    private final List<Consumer<Chat>> removeChatListeners;
+    private final List<Consumer<Message>> newMessageListeners;
+    private final List<Consumer<Message>> updateMessageListeners;
+    private final List<Consumer<Message>> removeMessageListeners;
 
-    private String endPointAddress;
+    private final String endPointAddress;
 
     public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
         super(serverUri);
@@ -218,9 +218,9 @@ class WhatsAppWsClient extends WebSocketClient {
             if (webSocketResponse.getStatus() == 200) {
                 this.chatsMessageListener.put(UUID.fromString((String) webSocketResponse.getResponse()), messageConsumer);
                 return true;
-            } else {
-                return false;
             }
+
+            return false;
         });
     }
 
@@ -231,9 +231,9 @@ class WhatsAppWsClient extends WebSocketClient {
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
                 return Chat.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
-            } else {
-                return null;
             }
+
+            return null;
         });
     }
 
@@ -244,9 +244,9 @@ class WhatsAppWsClient extends WebSocketClient {
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
                 return Chat.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
-            } else {
-                return null;
             }
+
+            return null;
         });
     }
 
@@ -283,9 +283,9 @@ class WhatsAppWsClient extends WebSocketClient {
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
                 return Message.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
-            } else {
-                return null;
             }
+
+            return null;
         });
     }
 
@@ -296,9 +296,9 @@ class WhatsAppWsClient extends WebSocketClient {
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
                 return Message.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
-            } else {
-                throw new RuntimeException(String.valueOf(webSocketResponse.getStatus()));
             }
+
+            return null;
         });
     }
 
@@ -307,7 +307,11 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setEvent("downloadMedia");
         payLoad.setPayload(msgId);
         return sendWsMessage(payLoad).thenCompose(response -> {
-            return downloadFile((String) response.getResponse());
+            if (response.getStatus() == 200) {
+                return downloadFile((String) response.getResponse());
+            }
+
+            return CompletableFuture.completedFuture(null);
         });
     }
 
@@ -319,7 +323,11 @@ class WhatsAppWsClient extends WebSocketClient {
         findPictureRequest.setFull(full);
         payLoad.setPayload(findPictureRequest);
         return sendWsMessage(payLoad).thenCompose(response -> {
-            return downloadFile((String) response.getResponse());
+            if (response.getStatus() == 200) {
+                return downloadFile((String) response.getResponse());
+            }
+
+            return CompletableFuture.completedFuture(null);
         });
     }
 
@@ -369,7 +377,7 @@ class WhatsAppWsClient extends WebSocketClient {
                 RequestBody formBody = new MultipartBody.Builder()
                         .setType(MultipartBody.FORM)
                         .addFormDataPart("file", name,
-                                RequestBody.create(file, MediaType.parse(new Tika().detect(file))))
+                                RequestBody.create(MediaType.parse(new Tika().detect(file)), file))
                         .build();
 
                 int port = getConnection().getRemoteSocketAddress().getPort();
@@ -513,6 +521,77 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<DriverState> getDriverState() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("getDriverState");
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            JsonNode jsonNode = (JsonNode) webSocketResponse.getResponse();
+            return DriverState.valueOf(jsonNode.get("status").asText());
+        });
+    }
+
+    public CompletableFuture<SelfInfo> getSelfInfo() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("getSelfInfo");
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return new SelfInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+        });
+    }
+
+    public CompletableFuture<Boolean> sendPresenceUnavailable() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("sendPresenceUnavailable");
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> sendPresenceAvailable() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("sendPresenceAvailable");
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<Boolean> forwardMessages(String[] chatIds, String[] msgIds) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("forwardMessage");
+        ForwardMessagesRequest request = new ForwardMessagesRequest();
+        request.setIdsChats(chatIds);
+        request.setIdsMsgs(msgIds);
+        payLoad.setPayload(request);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+    public CompletableFuture<GroupInviteLinkInfo> findGroupInviteInfo(String inviteCode) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("getGroupInviteInfoHandler");
+        if (!inviteCode.startsWith("https://chat.whatsapp.com/")) {
+            payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
+        } else {
+            payLoad.setPayload(inviteCode);
+        }
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return new GroupInviteLinkInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse(), inviteCode.replace("https://chat.whatsapp.com/", ""));
+        });
+    }
+
+    public CompletableFuture<Boolean> joinGroup(String inviteCode) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("joinGroupByInviteLinkHandler");
+        if (!inviteCode.startsWith("https://chat.whatsapp.com/")) {
+            payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
+        } else {
+            payLoad.setPayload(inviteCode);
+        }
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
     public Map<UUID, WsMessageSend> getWsEvents() {
         return wsEvents;
     }
@@ -533,19 +612,20 @@ class WhatsAppWsClient extends WebSocketClient {
                     }
                 }));
                 break;
-            case "update-estado":
+            case "update-state":
+                DriverState driverState = DriverState.valueOf(split[1]);
                 executorService.submit(runnableFactory.apply(() -> {
                     if (onUpdateDriverState != null) {
-                        onUpdateDriverState.accept(DriverState.valueOf(split[1]));
+                        onUpdateDriverState.accept(driverState);
                     }
                 }));
-                break;
-            case "init":
-                executorService.submit(runnableFactory.apply(() -> {
-                    if (onInit != null) {
-                        onInit.run();
-                    }
-                }));
+                if (driverState == DriverState.LOGGED) {
+                    executorService.submit(runnableFactory.apply(() -> {
+                        if (onInit != null) {
+                            onInit.run();
+                        }
+                    }));
+                }
                 break;
             case "new-chat":
                 for (Consumer<Chat> newChatListener : newChatListeners) {

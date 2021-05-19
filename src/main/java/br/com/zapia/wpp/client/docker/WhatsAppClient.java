@@ -17,7 +17,10 @@ import com.github.dockerjava.core.DockerClientConfig;
 import java.io.Closeable;
 import java.io.File;
 import java.net.URI;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -26,34 +29,34 @@ import java.util.logging.Logger;
 
 public class WhatsAppClient {
 
-    private static Logger logger = Logger.getLogger(WhatsAppClient.class.getName());
+    private static final Logger logger = Logger.getLogger(WhatsAppClient.class.getName());
 
-    private Runnable onInit;
-    private Consumer<String> onNeedQrCode;
-    private Consumer<DriverState> onUpdateDriverState;
-    private Consumer<Throwable> onError;
-    private Runnable onWsConnect;
-    private OnWsDisconnect onWsDisconnect;
-    private Consumer<Long> onPing;
-    private Function<Runnable, Runnable> runnableFactory;
-    private Function<Callable, Callable> callableFactory;
-    private Function<Runnable, Thread> threadFactory;
-    private ExecutorService executorService;
-    private ScheduledExecutorService scheduledExecutorService;
+    private final Runnable onInit;
+    private final Consumer<String> onNeedQrCode;
+    private final Consumer<DriverState> onUpdateDriverState;
+    private final Consumer<Throwable> onError;
+    private final Runnable onWsConnect;
+    private final OnWsDisconnect onWsDisconnect;
+    private final Consumer<Long> onPing;
+    private final Function<Runnable, Runnable> runnableFactory;
+    private final Function<Callable, Callable> callableFactory;
+    private final Function<Runnable, Thread> threadFactory;
+    private final ExecutorService executorService;
+    private final ScheduledExecutorService scheduledExecutorService;
 
     private WhatsAppWsClient whatsAppWsClient;
-    private String dockerEndPoint;
-    private String insideDockerHostVolumeLocation;
-    private String identity;
-    private DockerClientConfig config;
-    private DockerClient dockerClient;
+    private final String dockerEndPoint;
+    private final String insideDockerHostVolumeLocation;
+    private final String identity;
+    private final DockerClientConfig config;
+    private final DockerClient dockerClient;
     private String localPort;
 
     private boolean successConnect;
     private long ping;
-    private ObjectMapper objectMapper;
-    private Map<String, List<Chat>> chatsAutoUpdate;
-    private Map<String, List<Message>> messagesAutoUpdate;
+    private final ObjectMapper objectMapper;
+    private final Map<String, List<Chat>> chatsAutoUpdate;
+    private final Map<String, List<Message>> messagesAutoUpdate;
 
     public WhatsAppClient(String dockerEndPoint, int dockerPort, boolean useTls, String insideDockerHostVolumeLocation, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.dockerEndPoint = dockerEndPoint;
@@ -145,6 +148,27 @@ public class WhatsAppClient {
         }, 0, 10, TimeUnit.SECONDS);
     }
 
+    private void stopPreviousContainer() {
+        List<Container> containerResult = dockerClient.listContainersCmd()
+                .withShowAll(true)
+                .withNameFilter(Arrays.asList("whatsapp-api-" + identity))
+                .exec();
+        String containerId;
+        InspectContainerResponse inspect;
+        try {
+            if (containerResult.size() == 1) {
+                containerId = containerResult.get(0).getId();
+                inspect = dockerClient.inspectContainerCmd(containerId).exec();
+                if (inspect.getState().getRunning()) {
+                    dockerClient.stopContainerCmd(containerId).exec();
+                }
+                dockerClient.removeContainerCmd(containerId).withForce(true).exec();
+            }
+        } catch (Exception ignore) {
+
+        }
+    }
+
     public CompletableFuture<Boolean> start() {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -165,24 +189,7 @@ public class WhatsAppClient {
                         logger.log(Level.INFO, "Pull Image Complete");
                     }
                 }).awaitCompletion();
-                List<Container> containerResult = dockerClient.listContainersCmd()
-                        .withShowAll(true)
-                        .withNameFilter(Arrays.asList("whatsapp-api-" + identity))
-                        .exec();
-                String containerId;
-                InspectContainerResponse inspect;
-                try {
-                    if (containerResult.size() == 1) {
-                        containerId = containerResult.get(0).getId();
-                        inspect = dockerClient.inspectContainerCmd(containerId).exec();
-                        if (inspect.getState().getRunning()) {
-                            dockerClient.stopContainerCmd(containerId).exec();
-                        }
-                        dockerClient.removeContainerCmd(containerId).withForce(true).exec();
-                    }
-                } catch (Exception ignore) {
-
-                }
+                stopPreviousContainer();
                 Volume chromeCache = new Volume("/home/chrome/cacheWhatsApp");
                 CreateContainerCmd containerCmd = dockerClient.createContainerCmd("bobaoapae/whatsapp-api:latest");
                 containerCmd.withName("whatsapp-api-" + identity);
@@ -195,10 +202,10 @@ public class WhatsAppClient {
                         .withAutoRemove(true)
                         .withBinds(new Bind(insideDockerHostVolumeLocation + "/" + identity, chromeCache)));
                 CreateContainerResponse exec = containerCmd.exec();
-                containerId = exec.getId();
+                String containerId = exec.getId();
                 dockerClient.startContainerCmd(containerId).exec();
                 dockerClient.waitContainerCmd(containerId);
-                inspect = dockerClient.inspectContainerCmd(containerId).exec();
+                InspectContainerResponse inspect = dockerClient.inspectContainerCmd(containerId).exec();
                 Map<ExposedPort, Ports.Binding[]> bindings = inspect.getNetworkSettings().getPorts().getBindings();
                 localPort = "";
                 for (Map.Entry<ExposedPort, Ports.Binding[]> exposedPortEntry : bindings.entrySet()) {
@@ -244,6 +251,16 @@ public class WhatsAppClient {
                 logger.log(Level.SEVERE, "Start Docker Container", e);
                 return false;
             }
+        });
+    }
+
+    public CompletableFuture<Void> stop() {
+        return CompletableFuture.supplyAsync(() -> {
+            stopPreviousContainer();
+            if (whatsAppWsClient != null) {
+                whatsAppWsClient.close();
+            }
+            return null;
         });
     }
 
@@ -426,5 +443,36 @@ public class WhatsAppClient {
 
     public CompletableFuture<Boolean> deleteMessage(String msgId, boolean fromAll) {
         return whatsAppWsClient.deleteMessage(msgId, fromAll);
+    }
+
+    public CompletableFuture<SelfInfo> getSelfInfo() {
+        return whatsAppWsClient.getSelfInfo();
+    }
+
+    public CompletableFuture<DriverState> getDriverState() {
+        if (whatsAppWsClient == null || !whatsAppWsClient.isOpen()) {
+            return CompletableFuture.completedFuture(DriverState.UNLOADED);
+        }
+        return whatsAppWsClient.getDriverState();
+    }
+
+    public CompletableFuture<Boolean> sendPresenceUnavailable() {
+        return whatsAppWsClient.sendPresenceUnavailable();
+    }
+
+    public CompletableFuture<Boolean> sendPresenceAvailable() {
+        return whatsAppWsClient.sendPresenceAvailable();
+    }
+
+    public CompletableFuture<Boolean> forwardMessages(String[] chatIds, String[] msgIds) {
+        return whatsAppWsClient.forwardMessages(chatIds, msgIds);
+    }
+
+    public CompletableFuture<GroupInviteLinkInfo> findGroupInviteInfo(String inviteCode) {
+        return whatsAppWsClient.findGroupInviteInfo(inviteCode);
+    }
+
+    public CompletableFuture<Boolean> joinGroup(String inviteCode) {
+        return whatsAppWsClient.joinGroup(inviteCode);
     }
 }

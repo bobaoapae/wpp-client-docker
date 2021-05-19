@@ -2,38 +2,25 @@ package br.com.zapia.wpp.client.docker.model;
 
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Objects;
 
-public class WhatsAppObjectWithId {
+public class WhatsAppObjectWithId extends WhatsAppObject {
 
-    protected ObjectMapper objectMapper;
 
     private String id;
-    private WhatsAppClient client;
-    private JsonNode jsonNode;
 
     public WhatsAppObjectWithId(WhatsAppClient client, JsonNode jsonNode) {
-        this.client = client;
-        this.objectMapper = new ObjectMapper();
-        this.setJsonNode(jsonNode);
+        super(client, jsonNode);
     }
 
     public String getId() {
         return id;
     }
 
-    public WhatsAppClient getClient() {
-        return client;
-    }
-
-    public JsonNode getJsonNode() {
-        return jsonNode;
-    }
-
+    @Override
     protected void setJsonNode(JsonNode jsonNode) {
-        this.jsonNode = jsonNode;
+        super.setJsonNode(jsonNode);
         JsonNode id = jsonNode.get("id");
         if (id != null) {
             if (id.get("_serialized") != null) {

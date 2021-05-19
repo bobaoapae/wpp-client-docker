@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -88,6 +89,10 @@ public class Chat extends WhatsAppObjectWithId {
     public CompletableFuture<Message> sendMessage(SendMessageRequest sendMessageRequest) {
         sendMessageRequest.setChatId(getId());
         return getClient().sendMessage(sendMessageRequest);
+    }
+
+    public CompletableFuture<Boolean> forwardMessages(Chat[] chats, Message[] messages) {
+        return getClient().forwardMessages(Arrays.stream(chats).map(WhatsAppObjectWithId::getId).toArray(String[]::new), Arrays.stream(messages).map(WhatsAppObjectWithId::getId).toArray(String[]::new));
     }
 
     public CompletableFuture<Boolean> sendSee() {
