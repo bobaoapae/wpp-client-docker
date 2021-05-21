@@ -37,6 +37,8 @@ public class WhatsAppClient {
     private final Consumer<Throwable> onError;
     private final Runnable onWsConnect;
     private final OnWsDisconnect onWsDisconnect;
+    private final Consumer<Integer> onLowBattery;
+    private final Runnable onPhoneDisconnect;
     private final Consumer<Long> onPing;
     private final Function<Runnable, Runnable> runnableFactory;
     private final Function<Callable, Callable> callableFactory;
@@ -46,6 +48,7 @@ public class WhatsAppClient {
 
     private WhatsAppWsClient whatsAppWsClient;
     private final String dockerEndPoint;
+    private final int maxMemoryMB;
     private final String insideDockerHostVolumeLocation;
     private final String identity;
     private final DockerClientConfig config;
@@ -58,8 +61,9 @@ public class WhatsAppClient {
     private final Map<String, List<Chat>> chatsAutoUpdate;
     private final Map<String, List<Message>> messagesAutoUpdate;
 
-    public WhatsAppClient(String dockerEndPoint, int dockerPort, boolean useTls, String insideDockerHostVolumeLocation, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
+    public WhatsAppClient(String dockerEndPoint, int dockerPort, boolean useTls, int maxMemoryMB, String insideDockerHostVolumeLocation, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.dockerEndPoint = dockerEndPoint;
+        this.maxMemoryMB = maxMemoryMB;
         this.insideDockerHostVolumeLocation = insideDockerHostVolumeLocation;
         this.identity = identity;
         this.onInit = () -> {
@@ -69,6 +73,8 @@ public class WhatsAppClient {
         this.onNeedQrCode = onNeedQrCode;
         this.onUpdateDriverState = onUpdateDriverState;
         this.onError = onError;
+        this.onLowBattery = onLowBattery;
+        this.onPhoneDisconnect = onPhoneDisconnect;
         this.onPing = onPing;
         this.onWsConnect = onWsConnect;
         this.onWsDisconnect = (code, reason, remote) -> {
@@ -195,9 +201,9 @@ public class WhatsAppClient {
                 containerCmd.withName("whatsapp-api-" + identity);
                 containerCmd.withHostConfig(HostConfig.newHostConfig()
                         .withPublishAllPorts(true)
-                        .withMemory(1024L * 1024L * 500L)
-                        .withMemoryReservation(1024L * 1024L * 300L)
-                        .withMemorySwap(1024L * 1024L * 700L)
+                        .withMemory(1024L * 1024L * maxMemoryMB)
+                        .withMemoryReservation((long) (1024L * 1024L * (maxMemoryMB * 0.8)))
+                        .withMemorySwap((long) (1024L * 1024L * (maxMemoryMB * 1.3)))
                         .withCpuPercent(3L)
                         .withAutoRemove(true)
                         .withBinds(new Bind(insideDockerHostVolumeLocation + "/" + identity, chromeCache)));
@@ -215,6 +221,8 @@ public class WhatsAppClient {
                         logger.info("JVM Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
                     } else if (exposedPortEntry.getKey().getPort() == 9222) {
                         logger.info("Chromium Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
+                    } else if (exposedPortEntry.getKey().getPort() == 8849) {
+                        logger.info("JProfiler Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
                     }
                 }
                 if (!localPort.isEmpty()) {
@@ -231,7 +239,7 @@ public class WhatsAppClient {
                                 whatsAppWsClient.close();
                             }
                         }
-                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://" + dockerEndPoint + ":" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, onWsConnect, onWsDisconnect, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService);
+                        whatsAppWsClient = new WhatsAppWsClient(URI.create("ws://" + dockerEndPoint + ":" + localPort + "/api/ws"), this, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService);
                         flag = whatsAppWsClient.connectBlocking(1, TimeUnit.MINUTES);
                         tries++;
                         Thread.sleep(100);

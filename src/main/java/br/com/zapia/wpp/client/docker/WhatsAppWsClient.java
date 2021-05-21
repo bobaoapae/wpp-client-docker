@@ -39,6 +39,8 @@ class WhatsAppWsClient extends WebSocketClient {
     private final Consumer<Throwable> onError;
     private final OnWsDisconnect onWsDisconnect;
     private final Runnable onWsConnect;
+    private final Runnable onPhoneDisconnect;
+    private final Consumer<Integer> onLowBattery;
     private final Function<Runnable, Runnable> runnableFactory;
     private final Function<Callable, Callable> callableFactory;
     private final Function<Runnable, Thread> threadFactory;
@@ -54,8 +56,10 @@ class WhatsAppWsClient extends WebSocketClient {
 
     private final String endPointAddress;
 
-    public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
+    public WhatsAppWsClient(URI serverUri, WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
         super(serverUri);
+        this.onLowBattery = onLowBattery;
+        this.onPhoneDisconnect = onPhoneDisconnect;
         this.endPointAddress = uri.getHost();
         this.wsEvents = new ConcurrentHashMap<>();
         this.wsPartialEvents = new ConcurrentHashMap<>();
@@ -140,7 +144,7 @@ class WhatsAppWsClient extends WebSocketClient {
                             stringBuilder.append(webSocketResponseFrame.getResponse());
                         });
                         fullResponse.setResponse(stringBuilder.toString());
-                        processWsResponse(wsMessageSend, response);
+                        processWsResponse(wsMessageSend, fullResponse);
                     }
                 } else {
                     processWsResponse(wsMessageSend, response);
@@ -168,7 +172,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
             }
         }
-        if (response.getStatus() == 200 || response.getStatus() == 201) {
+        if (response.getStatus() == 200 || response.getStatus() == 201 || response.getStatus() == 404) {
             wsMessageSend.getWsEvent().complete(response);
         } else if ((response.getStatus() == 500 || response.getStatus() == 429) && wsMessageSend.getTries() < 3) {
             wsMessageSend.setTries(wsMessageSend.getTries() + 1);
@@ -340,7 +344,7 @@ class WhatsAppWsClient extends WebSocketClient {
                 URLConnection urlConnection = url.openConnection();
                 String filename = URLDecoder.decode(urlConnection.getHeaderField("Filename"), StandardCharsets.UTF_8);
                 ReadableByteChannel readableByteChannel = Channels.newChannel(urlConnection.getInputStream());
-                File tempFile = File.createTempFile(filename + "#", "." + filename.split(".", 2)[1]);
+                File tempFile = File.createTempFile(filename + "#", "." + filename.split("\\.", 2)[1]);
                 FileOutputStream fileOutputStream = new FileOutputStream(tempFile);
                 FileChannel fileChannel = fileOutputStream.getChannel();
                 fileChannel
@@ -477,10 +481,12 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             List<Message> messages = new ArrayList<>();
-            if (webSocketResponse.getStatus() == 200) {
+            if (webSocketResponse.getStatus() == 200 && webSocketResponse.getResponse() != null) {
                 JsonNode jsonNode = (JsonNode) webSocketResponse.getResponse();
-                for (JsonNode node : jsonNode) {
-                    messages.add(Message.build(whatsAppClient, node));
+                if (!jsonNode.isEmpty()) {
+                    for (JsonNode node : jsonNode) {
+                        messages.add(Message.build(whatsAppClient, node));
+                    }
                 }
             }
             return messages;
@@ -569,20 +575,20 @@ class WhatsAppWsClient extends WebSocketClient {
     public CompletableFuture<GroupInviteLinkInfo> findGroupInviteInfo(String inviteCode) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent("getGroupInviteInfoHandler");
-        if (!inviteCode.startsWith("https://chat.whatsapp.com/")) {
+        if (!inviteCode.toLowerCase().startsWith("https://chat.whatsapp.com/")) {
             payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
         } else {
             payLoad.setPayload(inviteCode);
         }
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            return new GroupInviteLinkInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse(), inviteCode.replace("https://chat.whatsapp.com/", ""));
+            return new GroupInviteLinkInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse(), inviteCode.replaceAll("(?i)https://chat.whatsapp.com/", ""));
         });
     }
 
     public CompletableFuture<Boolean> joinGroup(String inviteCode) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent("joinGroupByInviteLinkHandler");
-        if (!inviteCode.startsWith("https://chat.whatsapp.com/")) {
+        if (!inviteCode.toLowerCase().startsWith("https://chat.whatsapp.com/")) {
             payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
         } else {
             payLoad.setPayload(inviteCode);
@@ -692,6 +698,20 @@ class WhatsAppWsClient extends WebSocketClient {
                         }
                     }));
                 }
+                break;
+            case "low-battery":
+                executorService.submit(runnableFactory.apply(() -> {
+                    if (onLowBattery != null) {
+                        onLowBattery.accept(Integer.valueOf(split[1]));
+                    }
+                }));
+                break;
+            case "disconnect":
+                executorService.submit(runnableFactory.apply(() -> {
+                    if (onPhoneDisconnect != null) {
+                        onPhoneDisconnect.run();
+                    }
+                }));
                 break;
             case "error":
                 onError(new RuntimeException(split[1]));

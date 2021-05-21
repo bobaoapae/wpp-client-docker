@@ -6,8 +6,8 @@ public enum DriverState {
     WAITING_QR_CODE_SCAN,
     QR_CODE_SCANNED,
     LOADING_STORE,
-    WAITING_LOAD,
     LOGIN_FAILED,
     LOGGED,
-    STORE_FAILED
+    STORE_FAILED,
+    WAITING_SYNC
 }
