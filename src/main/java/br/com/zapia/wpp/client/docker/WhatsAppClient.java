@@ -1,5 +1,6 @@
 package br.com.zapia.wpp.client.docker;
 
+import br.com.zapia.wpp.api.model.handlersWebSocket.EventWebSocket;
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.client.docker.model.EventType;
@@ -139,7 +140,7 @@ public class WhatsAppClient {
         scheduledExecutorService.scheduleWithFixedDelay(() -> {
             long pingStart = System.currentTimeMillis();
             WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-            payLoad.setEvent("pong");
+            payLoad.setEvent(EventWebSocket.Pong);
             try {
                 whatsAppWsClient.sendWsMessage(payLoad).get(10, TimeUnit.SECONDS);
                 ping = System.currentTimeMillis() - pingStart;

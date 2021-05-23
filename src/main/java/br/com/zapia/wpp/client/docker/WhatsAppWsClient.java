@@ -1,5 +1,6 @@
 package br.com.zapia.wpp.client.docker;
 
+import br.com.zapia.wpp.api.model.handlersWebSocket.EventWebSocket;
 import br.com.zapia.wpp.api.model.payloads.*;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -211,7 +212,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("addChatMessageListener");
+        payLoad.setEvent(EventWebSocket.AddChatMessageListener);
         AddChatMessageListenerRequest request = new AddChatMessageListenerRequest();
         request.setChatId(chatId);
         request.setIncludeMe(includeMe);
@@ -230,7 +231,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Chat> findChatById(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("findChat");
+        payLoad.setEvent(EventWebSocket.FindChat);
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
@@ -243,7 +244,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Chat> findChatByNumber(String number) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("findChatByNumber");
+        payLoad.setEvent(EventWebSocket.FindChatByNumber);
         payLoad.setPayload(number);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
@@ -256,7 +257,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<List<Chat>> getAllChats() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getAllChats");
+        payLoad.setEvent(EventWebSocket.GetAllChats);
         return sendWsMessage(payLoad).thenApply(response -> {
             List<Chat> chats = new ArrayList<>();
             JsonNode jsonNode = (JsonNode) response.getResponse();
@@ -269,7 +270,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<List<Contact>> getAllContacts() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getAllContacts");
+        payLoad.setEvent(EventWebSocket.GetAllContacts);
         return sendWsMessage(payLoad).thenApply(response -> {
             List<Contact> contacts = new ArrayList<>();
             JsonNode jsonNode = (JsonNode) response.getResponse();
@@ -282,7 +283,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Message> findMessage(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("findMessage");
+        payLoad.setEvent(EventWebSocket.FindMessage);
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
@@ -295,7 +296,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Message> sendMessage(SendMessageRequest sendMessageRequest) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("sendMessage");
+        payLoad.setEvent(EventWebSocket.SendMessage);
         payLoad.setPayload(sendMessageRequest);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
@@ -308,7 +309,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<File> downloadMediaMessage(String msgId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("downloadMedia");
+        payLoad.setEvent(EventWebSocket.DownloadMedia);
         payLoad.setPayload(msgId);
         return sendWsMessage(payLoad).thenCompose(response -> {
             if (response.getStatus() == 200) {
@@ -321,7 +322,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<File> getProfilePic(String contactId, boolean full) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("findPicture");
+        payLoad.setEvent(EventWebSocket.FindPicture);
         FindPictureRequest findPictureRequest = new FindPictureRequest();
         findPictureRequest.setId(contactId);
         findPictureRequest.setFull(full);
@@ -405,7 +406,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> seeChat(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("seeChat");
+        payLoad.setEvent(EventWebSocket.SeeChat);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -414,7 +415,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> pinChat(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("pinChat");
+        payLoad.setEvent(EventWebSocket.PinChat);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -423,7 +424,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> unPinChat(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("unPinChat");
+        payLoad.setEvent(EventWebSocket.UnPinChat);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -432,7 +433,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> markChatComposing(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("markComposing");
+        payLoad.setEvent(EventWebSocket.MarkComposing);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -441,7 +442,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> markChatPaused(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("markPaused");
+        payLoad.setEvent(EventWebSocket.MarkPaused);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -450,7 +451,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> markChatRecording(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("markRecording");
+        payLoad.setEvent(EventWebSocket.MarkRecording);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -459,7 +460,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> markMessagePlayed(String msgId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("markPlayed");
+        payLoad.setEvent(EventWebSocket.MarkPlayed);
         payLoad.setPayload(msgId);
         return sendWsMessage(payLoad).thenApply(response -> {
             return response.getStatus() == 200;
@@ -468,7 +469,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> subscribeChatPresence(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("subscribePresence");
+        payLoad.setEvent(EventWebSocket.SubscribePresence);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
@@ -477,7 +478,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<List<Message>> loadEarlyMessagesChat(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("loadEarly");
+        payLoad.setEvent(EventWebSocket.LoadEarly);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             List<Message> messages = new ArrayList<>();
@@ -495,7 +496,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> deleteChat(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("deleteChat");
+        payLoad.setEvent(EventWebSocket.DeleteChat);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200 || webSocketResponse.getStatus() == 404;
@@ -504,7 +505,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> clearChatMessages(String chatId, boolean keepFavorites) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("clearChat");
+        payLoad.setEvent(EventWebSocket.ClearChat);
         ClearChatRequest clearChatRequest = new ClearChatRequest();
         clearChatRequest.setChatId(chatId);
         clearChatRequest.setChatId(chatId);
@@ -520,7 +521,7 @@ class WhatsAppWsClient extends WebSocketClient {
         deleteMessageRequest.setFromAll(fromAll);
         deleteMessageRequest.setMsgId(msgId);
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("deleteMessage");
+        payLoad.setEvent(EventWebSocket.DeleteMessage);
         payLoad.setPayload(deleteMessageRequest);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200 || webSocketResponse.getStatus() == 404;
@@ -529,7 +530,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<DriverState> getDriverState() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getDriverState");
+        payLoad.setEvent(EventWebSocket.GetDriverState);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             JsonNode jsonNode = (JsonNode) webSocketResponse.getResponse();
             return DriverState.valueOf(jsonNode.get("status").asText());
@@ -538,23 +539,23 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<SelfInfo> getSelfInfo() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getSelfInfo");
+        payLoad.setEvent(EventWebSocket.GetSelfInfo);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return new SelfInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
         });
     }
 
-    public CompletableFuture<Boolean> sendPresenceUnavailable() {
+    public CompletableFuture<Boolean> sendPresenceAvailable() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("sendPresenceUnavailable");
+        payLoad.setEvent(EventWebSocket.SendPresenceAvailable);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
         });
     }
 
-    public CompletableFuture<Boolean> sendPresenceAvailable() {
+    public CompletableFuture<Boolean> sendPresenceUnavailable() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("sendPresenceAvailable");
+        payLoad.setEvent(EventWebSocket.SendPresenceUnavailable);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;
         });
@@ -562,7 +563,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> forwardMessages(String[] chatIds, String[] msgIds) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("forwardMessage");
+        payLoad.setEvent(EventWebSocket.ForwardMessage);
         ForwardMessagesRequest request = new ForwardMessagesRequest();
         request.setIdsChats(chatIds);
         request.setIdsMsgs(msgIds);
@@ -574,7 +575,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<GroupInviteLinkInfo> findGroupInviteInfo(String inviteCode) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getGroupInviteInfoHandler");
+        payLoad.setEvent(EventWebSocket.GetGroupInviteInfo);
         if (!inviteCode.toLowerCase().startsWith("https://chat.whatsapp.com/")) {
             payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
         } else {
@@ -587,7 +588,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<Boolean> joinGroup(String inviteCode) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("joinGroupByInviteLinkHandler");
+        payLoad.setEvent(EventWebSocket.JoinGroupByInviteLink);
         if (!inviteCode.toLowerCase().startsWith("https://chat.whatsapp.com/")) {
             payLoad.setPayload("https://chat.whatsapp.com/" + inviteCode);
         } else {
@@ -600,7 +601,7 @@ class WhatsAppWsClient extends WebSocketClient {
 
     public CompletableFuture<String> getQrCode() {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent("getQrCode");
+        payLoad.setEvent(EventWebSocket.GetQrCode);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
                 return (String) webSocketResponse.getResponse();
