@@ -483,4 +483,8 @@ public class WhatsAppClient {
     public CompletableFuture<Boolean> joinGroup(String inviteCode) {
         return whatsAppWsClient.joinGroup(inviteCode);
     }
+
+    public CompletableFuture<String> getQrCode() {
+        return whatsAppWsClient.getQrCode();
+    }
 }

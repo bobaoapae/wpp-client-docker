@@ -598,6 +598,17 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<String> getQrCode() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent("getQrCode");
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            if (webSocketResponse.getStatus() == 200) {
+                return (String) webSocketResponse.getResponse();
+            }
+            return "";
+        });
+    }
+
     public Map<UUID, WsMessageSend> getWsEvents() {
         return wsEvents;
     }

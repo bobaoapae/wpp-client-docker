@@ -62,6 +62,7 @@ public class WhatsAppClientBuilder {
         this.onPing = (ping) -> {
             logger.log(Level.INFO, "Ping::" + ping + "ms");
         };
+        this.maxMemoryMB = 500;
     }
 
     public WhatsAppClientBuilder onInit(Runnable onInit) {
