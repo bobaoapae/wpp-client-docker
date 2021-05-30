@@ -103,8 +103,16 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().markChatComposing(getId());
     }
 
+    public CompletableFuture<Boolean> markRead() {
+        return getClient().markChatRead(getId());
+    }
+
     public CompletableFuture<Boolean> markRecording() {
         return getClient().markChatRecording(getId());
+    }
+
+    public CompletableFuture<Boolean> markUnRead() {
+        return getClient().markChatUnRead(getId());
     }
 
     public CompletableFuture<Boolean> markPaused() {

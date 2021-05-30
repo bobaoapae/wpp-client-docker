@@ -449,9 +449,28 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<Boolean> markChatRead(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent(EventWebSocket.MarkRead);
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
     public CompletableFuture<Boolean> markChatRecording(String chatId) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent(EventWebSocket.MarkRecording);
+        payLoad.setPayload(chatId);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
+
+    public CompletableFuture<Boolean> markChatUnRead(String chatId) {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent(EventWebSocket.MarkUnRead);
         payLoad.setPayload(chatId);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             return webSocketResponse.getStatus() == 200;

@@ -13,11 +13,7 @@ public class WhatsAppClientBuilder {
 
     private static final Logger logger = Logger.getLogger(WhatsAppClient.class.getName());
 
-    private final String dockerEndPoint;
-    private final int dockerPort;
-    private final boolean useTls;
-    private int maxMemoryMB;
-    private final String insideDockerHostVolumeLocation;
+    private final BaseConfig baseConfig;
     private final String identity;
     private Runnable onInit;
     private Consumer<String> onNeedQrCode;
@@ -32,12 +28,9 @@ public class WhatsAppClientBuilder {
     private Function<Callable, Callable> callableFactory;
     private Function<Runnable, Thread> threadFactory;
 
-    public WhatsAppClientBuilder(String dockerEndPoint, int dockerPort, boolean useTls, String insideDockerHostVolumeLocation, String identity) {
-        this.dockerEndPoint = dockerEndPoint;
-        this.dockerPort = dockerPort;
-        this.useTls = useTls;
-        this.insideDockerHostVolumeLocation = insideDockerHostVolumeLocation;
-        this.identity = identity;
+    public WhatsAppClientBuilder(BaseConfig baseConfig) {
+        this.baseConfig = baseConfig;
+        this.identity = baseConfig.getIdentity();
         this.onInit = () -> {
             logger.log(Level.INFO, "init");
         };
@@ -62,7 +55,6 @@ public class WhatsAppClientBuilder {
         this.onPing = (ping) -> {
             logger.log(Level.INFO, "Ping::" + ping + "ms");
         };
-        this.maxMemoryMB = 500;
     }
 
     public WhatsAppClientBuilder onInit(Runnable onInit) {
@@ -115,11 +107,6 @@ public class WhatsAppClientBuilder {
         return this;
     }
 
-    public WhatsAppClientBuilder maxMemoryMB(int maxMemoryMB) {
-        this.maxMemoryMB = maxMemoryMB;
-        return this;
-    }
-
     public WhatsAppClientBuilder onLowBattery(Consumer<Integer> onLowBattery) {
         this.onLowBattery = onLowBattery;
         return this;
@@ -131,6 +118,6 @@ public class WhatsAppClientBuilder {
     }
 
     public WhatsAppClient builder() {
-        return new WhatsAppClient(dockerEndPoint, dockerPort, useTls, maxMemoryMB, insideDockerHostVolumeLocation, identity, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
+        return new WhatsAppClient(baseConfig, identity, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
     }
 }

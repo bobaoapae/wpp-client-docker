@@ -110,7 +110,7 @@ class WhatsAppClientTest {
         };
 
 
-        WhatsAppClientBuilder builder = new WhatsAppClientBuilder("docker.joaoiot.com.br", 2375, false, "/home/docker/zapia/wpp-client-docker/caches","teste");
+        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "docker.joaoiot.com.br").withAutoUpdateBaseImage(true).withMaxMemoryMB(700).withAutoUpdateBaseImage(true).build());
         builder.onInit(onInit)
                 .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
