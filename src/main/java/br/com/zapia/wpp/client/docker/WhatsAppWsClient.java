@@ -108,6 +108,7 @@ class WhatsAppWsClient extends WebSocketClient {
             try {
                 send(serialized);
             } catch (Exception e) {
+                wsEvents.remove(uuid);
                 if (wsMessageSend.getTries() < 3) {
                     wsMessageSend.setTries(wsMessageSend.getTries() + 1);
                     onError(new RuntimeException("Fail on send message to websocket, message wil be send again in 1 minute, tries remain {" + (3 - wsMessageSend.getTries()) + "}"));
