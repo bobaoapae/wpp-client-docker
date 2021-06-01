@@ -629,6 +629,14 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<Boolean> logout() {
+        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent(EventWebSocket.Logout);
+        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
+            return webSocketResponse.getStatus() == 200;
+        });
+    }
+
     public Map<UUID, WsMessageSend> getWsEvents() {
         return wsEvents;
     }

@@ -374,4 +374,8 @@ public class WhatsAppClient {
     public CompletableFuture<String> getQrCode() {
         return whatsAppWsClient.getQrCode();
     }
+
+    public CompletableFuture<Boolean> logout() {
+        return whatsAppWsClient.logout();
+    }
 }
