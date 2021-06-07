@@ -132,9 +132,11 @@ public class WhatsAppClient {
     }
 
     public CompletableFuture<Boolean> start() {
+        successConnect = false;
         return baseConfig.getWsClient(this, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService).thenApply(whatsAppWsClient1 -> {
             if (whatsAppWsClient1 != null) {
                 whatsAppWsClient = whatsAppWsClient1;
+                successConnect = true;
                 return true;
             }
             return false;
