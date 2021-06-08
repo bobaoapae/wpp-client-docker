@@ -44,6 +44,7 @@ public class WhatsAppClient {
     private final ObjectMapper objectMapper;
     private final Map<String, List<Chat>> chatsAutoUpdate;
     private final Map<String, List<Message>> messagesAutoUpdate;
+    private ScheduledFuture<?> pingFuture;
 
     public WhatsAppClient(BaseConfig baseConfig, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.baseConfig = baseConfig;
@@ -135,7 +136,7 @@ public class WhatsAppClient {
             if (whatsAppWsClient1 != null) {
                 whatsAppWsClient = whatsAppWsClient1;
                 successConnect = true;
-                scheduledExecutorService.scheduleWithFixedDelay(() -> {
+                pingFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
                     baseConfig.ping(executorService);
                 }, 0, 10, TimeUnit.SECONDS);
                 return true;
@@ -145,13 +146,15 @@ public class WhatsAppClient {
     }
 
     public CompletableFuture<Void> stop() {
-        return CompletableFuture.supplyAsync(() -> {
+        return CompletableFuture.runAsync(() -> {
+            if (pingFuture != null) {
+                pingFuture.cancel(true);
+            }
             baseConfig.stop();
             if (whatsAppWsClient != null) {
                 whatsAppWsClient.close();
             }
-            return null;
-        });
+        }, executorService);
     }
 
     public void addChatAutoUpdate(Chat chat) {

@@ -35,7 +35,7 @@ public class WebSocketConfig extends BaseConfig {
             } catch (Exception e) {
                 throw new CompletionException(e);
             }
-        });
+        }, executorService);
     }
 
     @Override
