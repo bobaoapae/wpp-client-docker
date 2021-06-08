@@ -147,13 +147,11 @@ public class WhatsAppClient {
 
     public CompletableFuture<Void> stop() {
         return CompletableFuture.runAsync(() -> {
+            successConnect = false;
             if (pingFuture != null) {
                 pingFuture.cancel(true);
             }
             baseConfig.stop();
-            if (whatsAppWsClient != null) {
-                whatsAppWsClient.close();
-            }
         }, executorService);
     }
 
