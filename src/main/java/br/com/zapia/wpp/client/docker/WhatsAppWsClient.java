@@ -341,7 +341,7 @@ class WhatsAppWsClient extends WebSocketClient {
         CompletableFuture<File> completableFuture = new CompletableFuture<>();
         executorService.submit(() -> {
             try {
-                int port = getConnection().getRemoteSocketAddress().getPort();
+                int port = getRemotePort();
                 URL url = new URL("http://" + endPointAddress + ":" + port + "/api/downloadFile/" + key);
                 URLConnection urlConnection = url.openConnection();
                 String filename = URLDecoder.decode(urlConnection.getHeaderField("Filename"), StandardCharsets.UTF_8);
@@ -762,6 +762,14 @@ class WhatsAppWsClient extends WebSocketClient {
                 }));
                 break;
         }
+    }
+
+    public int getRemotePort() {
+        return getConnection().getRemoteSocketAddress().getPort();
+    }
+
+    public String getRemoteEndPoint() {
+        return endPointAddress;
     }
 
     @Override

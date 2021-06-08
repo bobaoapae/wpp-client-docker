@@ -12,16 +12,6 @@ import java.util.function.Function;
 
 public abstract class BaseConfig {
 
-    protected String identity;
-
-    public BaseConfig(String identity) {
-        this.identity = identity;
-    }
-
-    public String getIdentity() {
-        return identity;
-    }
-
     public abstract CompletableFuture<WhatsAppWsClient> getWsClient(WhatsAppClient whatsAppClient,
                                                                     Runnable onInit,
                                                                     Consumer<String> onNeedQrCode,
@@ -37,6 +27,8 @@ public abstract class BaseConfig {
                                                                     Function<Runnable, Thread> threadFactory,
                                                                     ExecutorService executorService,
                                                                     ScheduledExecutorService scheduledExecutorService);
+
+    protected abstract void ping(ExecutorService executorService);
 
     public abstract void stop();
 }

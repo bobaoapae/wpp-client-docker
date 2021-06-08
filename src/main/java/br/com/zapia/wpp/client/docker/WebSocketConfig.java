@@ -14,8 +14,7 @@ public class WebSocketConfig extends BaseConfig {
     private final int remotePort;
     private WhatsAppWsClient whatsAppWsClient;
 
-    public WebSocketConfig(String identity, String remoteAddress, int remotePort) {
-        super(identity);
+    public WebSocketConfig(String remoteAddress, int remotePort) {
         this.remoteAddress = remoteAddress;
         this.remotePort = remotePort;
     }
@@ -37,6 +36,11 @@ public class WebSocketConfig extends BaseConfig {
                 throw new CompletionException(e);
             }
         });
+    }
+
+    @Override
+    protected void ping(ExecutorService executorService) {
+        executorService.submit(() -> whatsAppWsClient.sendPing());
     }
 
     @Override

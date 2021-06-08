@@ -37,7 +37,6 @@ public class WhatsAppClient {
 
     private WhatsAppWsClient whatsAppWsClient;
     private final BaseConfig baseConfig;
-    private final String identity;
     private String localPort;
 
     private boolean successConnect;
@@ -46,9 +45,8 @@ public class WhatsAppClient {
     private final Map<String, List<Chat>> chatsAutoUpdate;
     private final Map<String, List<Message>> messagesAutoUpdate;
 
-    public WhatsAppClient(BaseConfig baseConfig, String identity, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
+    public WhatsAppClient(BaseConfig baseConfig, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.baseConfig = baseConfig;
-        this.identity = identity;
         this.onInit = () -> {
             onInit();
             onInit.run();
@@ -137,6 +135,9 @@ public class WhatsAppClient {
             if (whatsAppWsClient1 != null) {
                 whatsAppWsClient = whatsAppWsClient1;
                 successConnect = true;
+                scheduledExecutorService.scheduleWithFixedDelay(() -> {
+                    baseConfig.ping(executorService);
+                }, 0, 10, TimeUnit.SECONDS);
                 return true;
             }
             return false;
@@ -379,5 +380,17 @@ public class WhatsAppClient {
 
     public CompletableFuture<Boolean> logout() {
         return whatsAppWsClient.logout();
+    }
+
+    public int getRemotePort() {
+        return whatsAppWsClient.getRemotePort();
+    }
+
+    public String getRemoteEndPoint() {
+        return whatsAppWsClient.getRemoteEndPoint();
+    }
+
+    public boolean isOpen() {
+        return whatsAppWsClient != null && whatsAppWsClient.isOpen();
     }
 }

@@ -14,7 +14,6 @@ public class WhatsAppClientBuilder {
     private static final Logger logger = Logger.getLogger(WhatsAppClient.class.getName());
 
     private final BaseConfig baseConfig;
-    private final String identity;
     private Runnable onInit;
     private Consumer<String> onNeedQrCode;
     private Consumer<DriverState> onUpdateDriverState;
@@ -30,7 +29,6 @@ public class WhatsAppClientBuilder {
 
     public WhatsAppClientBuilder(BaseConfig baseConfig) {
         this.baseConfig = baseConfig;
-        this.identity = baseConfig.getIdentity();
         this.onInit = () -> {
             logger.log(Level.INFO, "init");
         };
@@ -118,6 +116,6 @@ public class WhatsAppClientBuilder {
     }
 
     public WhatsAppClient builder() {
-        return new WhatsAppClient(baseConfig, identity, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
+        return new WhatsAppClient(baseConfig, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory);
     }
 }

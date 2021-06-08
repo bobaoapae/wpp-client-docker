@@ -26,16 +26,19 @@ public class DockerConfig extends BaseConfig {
 
     private static final Logger logger = Logger.getLogger(DockerConfig.class.getName());
 
+    private final String identity;
     private final String remoteAddress;
     private final int remotePort;
     private final String insideDockerHostVolumeLocation;
     private final int maxMemoryMB;
     private final boolean autoUpdateBaseImage;
 
+    private WebSocketConfig webSocketConfig;
+
     private final DockerClient dockerClient;
 
     public DockerConfig(String identity, String remoteAddress, int remotePort, String insideDockerHostVolumeLocation, int maxMemoryMB, boolean autoUpdateBaseImage) {
-        super(identity);
+        this.identity = identity;
         this.remoteAddress = remoteAddress;
         this.remotePort = remotePort;
         this.insideDockerHostVolumeLocation = insideDockerHostVolumeLocation;
@@ -114,7 +117,7 @@ public class DockerConfig extends BaseConfig {
                     }
                 }
                 if (!localPort.isEmpty()) {
-                    var webSocketConfig = new WebSocketConfig(identity, remoteAddress, Integer.parseInt(localPort));
+                    webSocketConfig = new WebSocketConfig(remoteAddress, Integer.parseInt(localPort));
                     return webSocketConfig.getWsClient(whatsAppClient, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService).get();
                 }
             } catch (Exception e) {
@@ -125,7 +128,15 @@ public class DockerConfig extends BaseConfig {
     }
 
     @Override
+    protected void ping(ExecutorService executorService) {
+        webSocketConfig.ping(executorService);
+    }
+
+    @Override
     public void stop() {
+        if (webSocketConfig != null) {
+            webSocketConfig.stop();
+        }
         List<Container> containerResult = dockerClient.listContainersCmd()
                 .withShowAll(true)
                 .withNameFilter(Arrays.asList("whatsapp-api-" + identity))
