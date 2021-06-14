@@ -109,6 +109,8 @@ public class WppCloneConfig extends BaseConfig {
 
     @Override
     public void stop() {
-        webSocketConfig.stop();
+        if (webSocketConfig != null) {
+            webSocketConfig.stop();
+        }
     }
 }

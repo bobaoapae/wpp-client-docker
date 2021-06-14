@@ -131,17 +131,18 @@ public class WhatsAppClient {
     }
 
     public CompletableFuture<Boolean> start() {
-        successConnect = false;
-        return baseConfig.getWsClient(this, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService).thenApply(whatsAppWsClient1 -> {
-            if (whatsAppWsClient1 != null) {
-                whatsAppWsClient = whatsAppWsClient1;
-                successConnect = true;
-                pingFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
-                    baseConfig.ping(executorService);
-                }, 0, 10, TimeUnit.SECONDS);
-                return true;
-            }
-            return false;
+        return stop().thenCompose(unused -> {
+            return baseConfig.getWsClient(this, onInit, onNeedQrCode, onUpdateDriverState, onError, onLowBattery, onPhoneDisconnect, onWsConnect, onWsDisconnect, onPing, runnableFactory, callableFactory, threadFactory, executorService, scheduledExecutorService).thenApply(whatsAppWsClient1 -> {
+                if (whatsAppWsClient1 != null) {
+                    whatsAppWsClient = whatsAppWsClient1;
+                    successConnect = true;
+                    pingFuture = scheduledExecutorService.scheduleWithFixedDelay(() -> {
+                        baseConfig.ping(executorService);
+                    }, 0, 10, TimeUnit.SECONDS);
+                    return true;
+                }
+                return false;
+            });
         });
     }
 
