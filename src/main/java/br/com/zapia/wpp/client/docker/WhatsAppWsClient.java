@@ -187,6 +187,26 @@ class WhatsAppWsClient extends WebSocketClient {
         }
     }
 
+    public CompletableFuture<StatsResponse> getStats() {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                int port = getRemotePort();
+                OkHttpClient client = new OkHttpClient();
+                Request request = new Request.Builder()
+                        .url("http://" + endPointAddress + ":" + port + "/api/remoteManagement/stats").get().build();
+                try (Response response = client.newCall(request).execute()) {
+                    if (!response.isSuccessful()) {
+                        throw new RuntimeException(response.body().string());
+                    } else {
+                        return objectMapper.readValue(response.body().string(), StatsResponse.class);
+                    }
+                }
+            } catch (Exception e) {
+                throw new CompletionException(e);
+            }
+        }, executorService);
+    }
+
     public void addNewChatListener(Consumer<Chat> chatConsumer) {
         this.newChatListeners.add(chatConsumer);
     }
@@ -338,8 +358,7 @@ class WhatsAppWsClient extends WebSocketClient {
     }
 
     public CompletableFuture<File> downloadFile(String key) {
-        CompletableFuture<File> completableFuture = new CompletableFuture<>();
-        executorService.submit(() -> {
+        return CompletableFuture.supplyAsync(() -> {
             try {
                 int port = getRemotePort();
                 URL url = new URL("http://" + endPointAddress + ":" + port + "/api/downloadFile/" + key);
@@ -354,12 +373,11 @@ class WhatsAppWsClient extends WebSocketClient {
                 fileChannel.close();
                 fileOutputStream.close();
                 readableByteChannel.close();
-                completableFuture.complete(tempFile);
+                return tempFile;
             } catch (Exception e) {
-                completableFuture.completeExceptionally(e);
+                throw new CompletionException(e);
             }
-        });
-        return completableFuture;
+        }, executorService);
     }
 
     public CompletableFuture<String> uploadFile(String name, String base64) {

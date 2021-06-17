@@ -2,6 +2,7 @@ package br.com.zapia.wpp.client.docker;
 
 import br.com.zapia.wpp.api.model.handlersWebSocket.EventWebSocket;
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
+import br.com.zapia.wpp.api.model.payloads.StatsResponse;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -154,6 +155,10 @@ public class WhatsAppClient {
             }
             baseConfig.stop();
         }, executorService);
+    }
+
+    public CompletableFuture<StatsResponse> getStats() {
+        return whatsAppWsClient.getStats();
     }
 
     public void addChatAutoUpdate(Chat chat) {

@@ -57,7 +57,7 @@ public class WppCloneConfig extends BaseConfig {
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder()
                     .addHeader("Authorization", "Bearer " + token)
-                    .url(wppRemoteAddress + "/api/remoteWppApi/webSocketAddress").get().build();
+                    .url(wppRemoteAddress + "/api/remoteManagement/webSocketAddress").get().build();
 
 
             var maxTries = 120;
@@ -98,7 +98,7 @@ public class WppCloneConfig extends BaseConfig {
             OkHttpClient client = new OkHttpClient();
             Request request = new Request.Builder()
                     .addHeader("Authorization", "Bearer " + token)
-                    .url(wppRemoteAddress + "/api/remoteWppApi/ping").get().build();
+                    .url(wppRemoteAddress + "/api/remoteManagement/ping").get().build();
             try {
                 client.newCall(request).execute();
             } catch (IOException e) {
