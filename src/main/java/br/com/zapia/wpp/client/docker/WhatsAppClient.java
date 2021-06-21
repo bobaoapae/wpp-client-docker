@@ -166,6 +166,9 @@ public class WhatsAppClient {
             chatsAutoUpdate.put(chat.getId(), new CopyOnWriteArrayList<>());
         }
         chatsAutoUpdate.get(chat.getId()).add(chat);
+        scheduledExecutorService.schedule(() -> {
+            chatsAutoUpdate.get(chat.getId()).remove(chat);
+        }, 10, TimeUnit.MINUTES);
     }
 
     public void addMessageAutoUpdate(Message message) {
@@ -173,6 +176,9 @@ public class WhatsAppClient {
             messagesAutoUpdate.put(message.getId(), new CopyOnWriteArrayList<>());
         }
         messagesAutoUpdate.get(message.getId()).add(message);
+        scheduledExecutorService.schedule(() -> {
+            messagesAutoUpdate.get(message.getId()).remove(message);
+        }, 10, TimeUnit.MINUTES);
     }
 
     public void addNewChatListener(Consumer<Chat> chatConsumer) {

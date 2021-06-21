@@ -99,8 +99,7 @@ public class WppCloneConfig extends BaseConfig {
             Request request = new Request.Builder()
                     .addHeader("Authorization", "Bearer " + token)
                     .url(wppRemoteAddress + "/api/remoteManagement/ping").get().build();
-            try {
-                client.newCall(request).execute();
+            try (Response ignored = client.newCall(request).execute()) {
             } catch (IOException e) {
                 throw new CompletionException(e);
             }
