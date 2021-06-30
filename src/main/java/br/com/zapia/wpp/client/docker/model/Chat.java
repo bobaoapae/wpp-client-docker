@@ -5,7 +5,6 @@ import br.com.zapia.wpp.client.docker.WhatsAppClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.File;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -16,12 +15,9 @@ import java.util.function.Consumer;
 public class Chat extends WhatsAppObjectWithId {
 
     private Contact contact;
-    private final LocalDateTime lastTimeWithAutoUpdate;
 
     protected Chat(WhatsAppClient client, JsonNode jsonNode) {
         super(client, jsonNode);
-        getClient().addChatAutoUpdate(this);
-        lastTimeWithAutoUpdate = LocalDateTime.now().plusMinutes(10);
     }
 
     public static Chat build(WhatsAppClient client, JsonNode jsonNode) {
@@ -160,10 +156,6 @@ public class Chat extends WhatsAppObjectWithId {
 
     public void update(Chat chat) {
         this.setJsonNode(chat.getJsonNode());
-    }
-
-    public boolean isWithAutoUpdate() {
-        return LocalDateTime.now().isAfter(lastTimeWithAutoUpdate);
     }
 
     @Override

@@ -5,13 +5,10 @@ import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.StatsResponse;
 import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.client.docker.model.*;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 
 import java.io.File;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -43,8 +40,6 @@ public class WhatsAppClient {
     private boolean successConnect;
     private long ping;
     private final ObjectMapper objectMapper;
-    private final Map<String, List<Chat>> chatsAutoUpdate;
-    private final Map<String, List<Message>> messagesAutoUpdate;
     private ScheduledFuture<?> pingFuture;
 
     public WhatsAppClient(BaseConfig baseConfig, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
@@ -71,48 +66,9 @@ public class WhatsAppClient {
         this.executorService = Executors.newCachedThreadPool(r -> threadFactory.apply(r));
         this.scheduledExecutorService = Executors.newScheduledThreadPool(20, r -> threadFactory.apply(r));
         this.objectMapper = new ObjectMapper();
-        this.chatsAutoUpdate = new ConcurrentHashMap<>();
-        this.messagesAutoUpdate = new ConcurrentHashMap<>();
     }
 
     private void onInit() {
-        addUpdateChatListener(chat -> {
-            if (chatsAutoUpdate.containsKey(chat.getId())) {
-                List<Chat> chats = chatsAutoUpdate.get(chat.getId());
-                for (Chat chat1 : chats) {
-                    chat1.update(chat);
-                }
-            }
-        });
-        addRemoveMessageListener(message -> {
-            if (chatsAutoUpdate.containsKey(message.getContact().getId())) {
-                List<Chat> chats = chatsAutoUpdate.get(message.getContact().getId());
-                for (Chat chat1 : chats) {
-                    int msgIndex = 0;
-                    for (JsonNode msg : chat1.getJsonNode().get("msgs").deepCopy()) {
-                        Message message1 = Message.build(this, msg);
-                        if (message1.equals(message)) {
-                            ((ArrayNode) chat1.getJsonNode().get("msgs")).remove(msgIndex);
-                        }
-                        msgIndex++;
-                    }
-                }
-            }
-        });
-        addUpdateMessageListener(message -> {
-            if (messagesAutoUpdate.containsKey(message.getId())) {
-                List<Message> messages = messagesAutoUpdate.get(message.getId());
-                for (Message message1 : messages) {
-                    message1.update(message);
-                }
-            }
-            if (messagesAutoUpdate.containsKey(message.getOldId())) {
-                List<Message> messages = messagesAutoUpdate.get(message.getOldId());
-                for (Message message1 : messages) {
-                    message1.update(message);
-                }
-            }
-        });
         scheduledExecutorService.scheduleWithFixedDelay(() -> {
             long pingStart = System.currentTimeMillis();
             WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
@@ -159,26 +115,6 @@ public class WhatsAppClient {
 
     public CompletableFuture<StatsResponse> getStats() {
         return whatsAppWsClient.getStats();
-    }
-
-    public void addChatAutoUpdate(Chat chat) {
-        if (!chatsAutoUpdate.containsKey(chat.getId())) {
-            chatsAutoUpdate.put(chat.getId(), new CopyOnWriteArrayList<>());
-        }
-        chatsAutoUpdate.get(chat.getId()).add(chat);
-        scheduledExecutorService.schedule(() -> {
-            chatsAutoUpdate.get(chat.getId()).remove(chat);
-        }, 10, TimeUnit.MINUTES);
-    }
-
-    public void addMessageAutoUpdate(Message message) {
-        if (!messagesAutoUpdate.containsKey(message.getId())) {
-            messagesAutoUpdate.put(message.getId(), new CopyOnWriteArrayList<>());
-        }
-        messagesAutoUpdate.get(message.getId()).add(message);
-        scheduledExecutorService.schedule(() -> {
-            messagesAutoUpdate.get(message.getId()).remove(message);
-        }, 10, TimeUnit.MINUTES);
     }
 
     public void addNewChatListener(Consumer<Chat> chatConsumer) {
