@@ -1,9 +1,7 @@
 package br.com.zapia.wpp.client.docker;
 
-import br.com.zapia.wpp.api.model.handlersWebSocket.EventWebSocket;
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.api.model.payloads.StatsResponse;
-import br.com.zapia.wpp.api.model.payloads.WebSocketRequestPayLoad;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -44,10 +42,7 @@ public class WhatsAppClient {
 
     public WhatsAppClient(BaseConfig baseConfig, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory) {
         this.baseConfig = baseConfig;
-        this.onInit = () -> {
-            onInit();
-            onInit.run();
-        };
+        this.onInit = onInit;
         this.onNeedQrCode = onNeedQrCode;
         this.onUpdateDriverState = onUpdateDriverState;
         this.onError = onError;
@@ -66,25 +61,6 @@ public class WhatsAppClient {
         this.executorService = Executors.newCachedThreadPool(r -> threadFactory.apply(r));
         this.scheduledExecutorService = Executors.newScheduledThreadPool(20, r -> threadFactory.apply(r));
         this.objectMapper = new ObjectMapper();
-    }
-
-    private void onInit() {
-        scheduledExecutorService.scheduleWithFixedDelay(() -> {
-            long pingStart = System.currentTimeMillis();
-            WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-            payLoad.setEvent(EventWebSocket.Pong);
-            try {
-                whatsAppWsClient.sendWsMessage(payLoad).get(10, TimeUnit.SECONDS);
-                ping = System.currentTimeMillis() - pingStart;
-                onPing.accept(ping);
-            } catch (InterruptedException | ExecutionException | TimeoutException e) {
-                executorService.submit(runnableFactory.apply(() -> {
-                    if (onError != null) {
-                        onError.accept(e);
-                    }
-                }));
-            }
-        }, 0, 10, TimeUnit.SECONDS);
     }
 
     public CompletableFuture<Boolean> start() {
