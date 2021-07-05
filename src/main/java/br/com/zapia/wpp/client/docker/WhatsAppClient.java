@@ -137,6 +137,10 @@ public class WhatsAppClient {
         return whatsAppWsClient.getAllContacts();
     }
 
+    public CompletableFuture<List<QuickReply>> getAllQuickReplies() {
+        return whatsAppWsClient.getAllQuickReplies();
+    }
+
     public CompletableFuture<Message> findMessage(String id) {
         return whatsAppWsClient.findMessage(id);
     }

@@ -302,6 +302,19 @@ class WhatsAppWsClient extends WebSocketClient {
         });
     }
 
+    public CompletableFuture<List<QuickReply>> getAllQuickReplies() {
+        var payLoad = new WebSocketRequestPayLoad();
+        payLoad.setEvent(EventWebSocket.GetAllQuickReplies);
+        return sendWsMessage(payLoad).thenApply(response -> {
+            var result = new ArrayList<QuickReply>();
+            JsonNode jsonNode = (JsonNode) response.getResponse();
+            jsonNode.forEach(jsonNode1 -> {
+                result.add(new QuickReply(whatsAppClient, jsonNode1));
+            });
+            return result;
+        });
+    }
+
     public CompletableFuture<Message> findMessage(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent(EventWebSocket.FindMessage);
