@@ -5,10 +5,12 @@ import br.com.zapia.wpp.api.model.payloads.*;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Strings;
 import okhttp3.*;
 import org.apache.tika.Tika;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
+import utils.Utils;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -27,7 +29,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 class WhatsAppWsClient extends WebSocketClient {
-
     private final Map<UUID, WsMessageSend> wsEvents;
     private final Map<UUID, List<WebSocketResponseFrame>> wsPartialEvents;
     private final Map<UUID, Consumer<Message>> chatsMessageListener;
@@ -143,7 +144,15 @@ class WhatsAppWsClient extends WebSocketClient {
                         List<WebSocketResponseFrame> webSocketResponseFrames = wsPartialEvents.get(uuid);
                         StringBuilder stringBuilder = new StringBuilder();
                         webSocketResponseFrames.forEach(webSocketResponseFrame -> {
-                            stringBuilder.append(webSocketResponseFrame.getResponse());
+                            String data = (String) webSocketResponseFrame.getResponse();
+                            if (!Strings.isNullOrEmpty(webSocketResponseFrame.getCompressionAlgorithm())) {
+                                try {
+                                    data = Utils.decompressB64(data);
+                                } catch (Exception e) {
+                                    onError(e);
+                                }
+                            }
+                            stringBuilder.append(data);
                         });
                         fullResponse.setResponse(stringBuilder.toString());
                         processWsResponse(wsMessageSend, fullResponse);

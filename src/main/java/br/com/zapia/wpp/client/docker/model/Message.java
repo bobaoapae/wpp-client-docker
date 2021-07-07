@@ -95,7 +95,9 @@ public class Message extends WhatsAppObjectWithId {
     @Override
     protected void setJsonNode(JsonNode jsonNode) {
         super.setJsonNode(jsonNode);
-        this.contact = new Contact(getClient(), jsonNode.get("senderObj"));
+        if (jsonNode.has("senderObj")) {
+            this.contact = new Contact(getClient(), jsonNode.get("senderObj"));
+        }
         JsonNode oldId = jsonNode.get("oldId");
         if (oldId != null) {
             if (oldId.get("_serialized") != null) {
