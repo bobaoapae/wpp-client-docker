@@ -707,6 +707,7 @@ class WhatsAppWsClient extends WebSocketClient {
                 }));
                 if (driverState == DriverState.LOGGED) {
                     executorService.submit(runnableFactory.apply(() -> {
+                        resetListeners();
                         if (onInit != null) {
                             onInit.run();
                         }
@@ -802,6 +803,15 @@ class WhatsAppWsClient extends WebSocketClient {
                 }));
                 break;
         }
+    }
+
+    private void resetListeners() {
+        newChatListeners.clear();
+        updateChatListeners.clear();
+        removeChatListeners.clear();
+        removeMessageListeners.clear();
+        newMessageListeners.clear();
+        updateMessageListeners.clear();
     }
 
     public int getRemotePort() {
