@@ -8,6 +8,7 @@ public class DockerConfigBuilder {
     private String insideDockerHostVolumeLocation;
     private int maxMemoryMB;
     private boolean autoUpdateBaseImage;
+    private boolean autoRemoveContainer;
 
     public DockerConfigBuilder(String identity, String remoteAddress) {
         this.identity = identity;
@@ -38,7 +39,12 @@ public class DockerConfigBuilder {
         return this;
     }
 
+    public DockerConfigBuilder withAutoRemoveContainer(boolean autoRemoveContainer) {
+        this.autoRemoveContainer = autoRemoveContainer;
+        return this;
+    }
+
     public DockerConfig build() {
-        return new DockerConfig(identity, remoteAddress, remotePort, insideDockerHostVolumeLocation, maxMemoryMB, autoUpdateBaseImage);
+        return new DockerConfig(identity, remoteAddress, remotePort, insideDockerHostVolumeLocation, maxMemoryMB, autoUpdateBaseImage, autoRemoveContainer);
     }
 }

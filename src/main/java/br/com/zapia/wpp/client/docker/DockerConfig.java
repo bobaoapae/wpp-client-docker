@@ -32,18 +32,20 @@ public class DockerConfig extends BaseConfig {
     private final String insideDockerHostVolumeLocation;
     private final int maxMemoryMB;
     private final boolean autoUpdateBaseImage;
+    private final boolean autoRemoveContainer;
 
     private WebSocketConfig webSocketConfig;
 
     private final DockerClient dockerClient;
 
-    public DockerConfig(String identity, String remoteAddress, int remotePort, String insideDockerHostVolumeLocation, int maxMemoryMB, boolean autoUpdateBaseImage) {
+    public DockerConfig(String identity, String remoteAddress, int remotePort, String insideDockerHostVolumeLocation, int maxMemoryMB, boolean autoUpdateBaseImage, boolean autoRemoveContainer) {
         this.identity = identity;
         this.remoteAddress = remoteAddress;
         this.remotePort = remotePort;
         this.insideDockerHostVolumeLocation = insideDockerHostVolumeLocation;
         this.maxMemoryMB = maxMemoryMB;
         this.autoUpdateBaseImage = autoUpdateBaseImage;
+        this.autoRemoveContainer = autoRemoveContainer;
         var dockerConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
                 .withDockerHost("tcp://" + remoteAddress + ":" + remotePort)
                 .withDockerTlsVerify(false)
@@ -97,7 +99,7 @@ public class DockerConfig extends BaseConfig {
                         .withMemoryReservation((long) (1024L * 1024L * (maxMemoryMB * 0.8)))
                         .withMemorySwap((long) (1024L * 1024L * (maxMemoryMB * 1.3)))
                         .withCpuPercent(3L)
-                        .withAutoRemove(true)
+                        .withAutoRemove(autoRemoveContainer)
                         .withBinds(new Bind(insideDockerHostVolumeLocation + "/" + identity, chromeCache)));
                 CreateContainerResponse exec = containerCmd.exec();
                 String containerId = exec.getId();
@@ -113,8 +115,6 @@ public class DockerConfig extends BaseConfig {
                         logger.info("JVM Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
                     } else if (exposedPortEntry.getKey().getPort() == 9222) {
                         logger.info("Chromium Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
-                    } else if (exposedPortEntry.getKey().getPort() == 8849) {
-                        logger.info("JProfiler Debugger Port: " + exposedPortEntry.getValue()[0].getHostPortSpec());
                     }
                 }
                 if (!localPort.isEmpty()) {

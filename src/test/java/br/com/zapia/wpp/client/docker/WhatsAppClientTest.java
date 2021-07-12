@@ -110,7 +110,7 @@ class WhatsAppClientTest {
         };
 
 
-        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "docker.joaoiot.com.br").withAutoUpdateBaseImage(true).withMaxMemoryMB(700).withAutoUpdateBaseImage(true).build());
+        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "localhost").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
         builder.onInit(onInit)
                 .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
@@ -159,6 +159,7 @@ class WhatsAppClientTest {
                 CompletableFuture<Void> newChatMsg3 = new CompletableFuture<>();
                 whatsAppClient.addNewChatListener(chat1 -> {
                     assertDoesNotThrow(() -> {
+                        chat1.update().join();
                         Message lastMsg = chat1.getLastMsg();
                         assertNotNull(lastMsg);
                         assertEquals("teste", lastMsg.getBody());
@@ -196,6 +197,7 @@ class WhatsAppClientTest {
                 assertTrue(whatsAppClient.getAllContacts().join().size() >= 1);
                 Thread.sleep(3000);
                 assertTrue(chat.clearMessages(false).join());
+                chat.update().join();
                 Thread.sleep(5000);
                 assertTrue(chat.getAllMessages().size() <= 3);
                 assertTrue(chat.delete().join());

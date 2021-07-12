@@ -12,23 +12,23 @@ import java.util.function.Function;
 
 public abstract class BaseConfig {
 
-    public abstract CompletableFuture<WhatsAppWsClient> getWsClient(WhatsAppClient whatsAppClient,
-                                                                    Runnable onInit,
-                                                                    Consumer<String> onNeedQrCode,
-                                                                    Consumer<DriverState> onUpdateDriverState,
-                                                                    Consumer<Throwable> onError,
-                                                                    Consumer<Integer> onLowBattery,
-                                                                    Runnable onPhoneDisconnect,
-                                                                    Runnable onWsConnect,
-                                                                    OnWsDisconnect onWsDisconnect,
-                                                                    Consumer<Long> onPing,
-                                                                    Function<Runnable, Runnable> runnableFactory,
-                                                                    Function<Callable, Callable> callableFactory,
-                                                                    Function<Runnable, Thread> threadFactory,
-                                                                    ExecutorService executorService,
-                                                                    ScheduledExecutorService scheduledExecutorService);
+    protected abstract CompletableFuture<WhatsAppWsClient> getWsClient(WhatsAppClient whatsAppClient,
+                                                                       Runnable onInit,
+                                                                       Consumer<String> onNeedQrCode,
+                                                                       Consumer<DriverState> onUpdateDriverState,
+                                                                       Consumer<Throwable> onError,
+                                                                       Consumer<Integer> onLowBattery,
+                                                                       Runnable onPhoneDisconnect,
+                                                                       Runnable onWsConnect,
+                                                                       OnWsDisconnect onWsDisconnect,
+                                                                       Consumer<Long> onPing,
+                                                                       Function<Runnable, Runnable> runnableFactory,
+                                                                       Function<Callable, Callable> callableFactory,
+                                                                       Function<Runnable, Thread> threadFactory,
+                                                                       ExecutorService executorService,
+                                                                       ScheduledExecutorService scheduledExecutorService);
 
     protected abstract void ping(ExecutorService executorService);
 
-    public abstract void stop();
+    protected abstract void stop();
 }

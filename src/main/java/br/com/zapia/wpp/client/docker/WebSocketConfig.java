@@ -8,19 +8,19 @@ import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-public class WebSocketConfig extends BaseConfig {
+class WebSocketConfig extends BaseConfig {
 
     private final String remoteAddress;
     private final int remotePort;
     private WhatsAppWsClient whatsAppWsClient;
 
-    public WebSocketConfig(String remoteAddress, int remotePort) {
+    protected WebSocketConfig(String remoteAddress, int remotePort) {
         this.remoteAddress = remoteAddress;
         this.remotePort = remotePort;
     }
 
     @Override
-    public CompletableFuture<WhatsAppWsClient> getWsClient(WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
+    protected CompletableFuture<WhatsAppWsClient> getWsClient(WhatsAppClient whatsAppClient, Runnable onInit, Consumer<String> onNeedQrCode, Consumer<DriverState> onUpdateDriverState, Consumer<Throwable> onError, Consumer<Integer> onLowBattery, Runnable onPhoneDisconnect, Runnable onWsConnect, OnWsDisconnect onWsDisconnect, Consumer<Long> onPing, Function<Runnable, Runnable> runnableFactory, Function<Callable, Callable> callableFactory, Function<Runnable, Thread> threadFactory, ExecutorService executorService, ScheduledExecutorService scheduledExecutorService) {
         stop();
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -45,7 +45,7 @@ public class WebSocketConfig extends BaseConfig {
     }
 
     @Override
-    public void stop() {
+    protected void stop() {
         if (whatsAppWsClient != null) {
             whatsAppWsClient.close();
             whatsAppWsClient = null;
