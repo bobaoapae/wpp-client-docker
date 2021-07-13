@@ -142,11 +142,11 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().clearChatMessages(getId(), keepFavorites);
     }
 
-    public CompletableFuture<Boolean> addMessageListener(Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+    public CompletableFuture<Boolean> addMessageListener(Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
         return addMessageListener(false, messageConsumer, eventType, properties);
     }
 
-    public CompletableFuture<Boolean> addMessageListener(boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+    public CompletableFuture<Boolean> addMessageListener(boolean includeMe, Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
         return getClient().addChatMessageListener(getId(), includeMe, messageConsumer, eventType, properties);
     }
 

@@ -166,7 +166,8 @@ class WhatsAppClientTest {
                         MediaMessage caption = lastMsg.reply(new File("pom.xml"), "caption").join();
                         assertNotNull(caption);
                         assertEquals("caption", caption.getCaption());
-                        chat1.addMessageListener(message1 -> {
+                        chat1.addMessageListener(messages -> {
+                            var message1 = messages.get(messages.size() - 1);
                             if (message1 instanceof MediaMessage) {
                                 File join = ((MediaMessage) message1).download().join();
                                 assertNotNull(join);

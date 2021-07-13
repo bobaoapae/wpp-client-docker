@@ -105,19 +105,19 @@ public class WhatsAppClient {
         whatsAppWsClient.addRemoveChatListener(chatConsumer);
     }
 
-    public void addNewMessageListener(Consumer<Message> messageConsumer) {
+    public void addNewMessageListener(Consumer<List<Message>> messageConsumer) {
         whatsAppWsClient.addNewMessageListener(messageConsumer);
     }
 
-    public void addUpdateMessageListener(Consumer<Message> messageConsumer) {
+    public void addUpdateMessageListener(Consumer<List<Message>> messageConsumer) {
         whatsAppWsClient.addUpdateMessageListener(messageConsumer);
     }
 
-    public void addRemoveMessageListener(Consumer<Message> messageConsumer) {
+    public void addRemoveMessageListener(Consumer<List<Message>> messageConsumer) {
         whatsAppWsClient.addRemoveMessageListener(messageConsumer);
     }
 
-    public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<Message> messageConsumer, EventType eventType, String... properties) {
+    public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
         return whatsAppWsClient.addChatMessageListener(chatId, includeMe, messageConsumer, eventType, properties);
     }
 
