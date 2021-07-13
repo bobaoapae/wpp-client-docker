@@ -131,7 +131,26 @@ class WhatsAppWsClient extends WebSocketClient {
             WsMessageSend wsMessageSend = wsEvents.get(uuid);
             try {
                 WebSocketResponse response = objectMapper.readValue(payload, WebSocketResponse.class);
-                processWsResponse(wsMessageSend, response);
+                if (response instanceof WebSocketResponseFrame) {
+                    if (!wsPartialEvents.containsKey(uuid)) {
+                        wsPartialEvents.put(uuid, new CopyOnWriteArrayList<>());
+                    }
+                    wsPartialEvents.get(uuid).add((WebSocketResponseFrame) response);
+                    if (((WebSocketResponseFrame) response).getQtdFrames() == wsPartialEvents.get(uuid).size()) {
+                        WebSocketResponse fullResponse = new WebSocketResponse();
+                        fullResponse.setStatus(response.getStatus());
+                        wsPartialEvents.get(uuid).sort(Comparator.comparingInt(WebSocketResponseFrame::getFrameId));
+                        List<WebSocketResponseFrame> webSocketResponseFrames = wsPartialEvents.get(uuid);
+                        StringBuilder stringBuilder = new StringBuilder();
+                        webSocketResponseFrames.forEach(webSocketResponseFrame -> {
+                            stringBuilder.append(webSocketResponseFrame.getResponse());
+                        });
+                        fullResponse.setResponse(stringBuilder.toString());
+                        processWsResponse(wsMessageSend, fullResponse);
+                    }
+                } else {
+                    processWsResponse(wsMessageSend, response);
+                }
             } catch (IOException e) {
                 wsMessageSend.getWsEvent().completeExceptionally(e);
             }
