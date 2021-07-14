@@ -129,6 +129,14 @@ public class WhatsAppClient {
         return whatsAppWsClient.findChatByNumber(number);
     }
 
+    public CompletableFuture<Contact> findContactById(String id) {
+        return whatsAppWsClient.findContactById(id);
+    }
+
+    public CompletableFuture<Contact> findContactByNumber(String number) {
+        return whatsAppWsClient.findContactByNumber(number);
+    }
+
     public CompletableFuture<List<Chat>> getAllChats() {
         return whatsAppWsClient.getAllChats();
     }
