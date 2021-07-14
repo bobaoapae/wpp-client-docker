@@ -40,8 +40,23 @@ public class Message extends WhatsAppObjectWithId {
         return oldId;
     }
 
-    public Contact getContact() {
-        return contact;
+    public String getSenderId() {
+        if (jsonNode.has("author")) {
+            return jsonNode.get("author").asText();
+        }
+
+        return jsonNode.get("from").asText();
+    }
+
+    public CompletableFuture<Contact> getContact() {
+        if (contact != null) {
+            return CompletableFuture.completedFuture(contact);
+        }
+
+        return client.findContactById(getSenderId()).thenApply(contact1 -> {
+            contact = contact1;
+            return contact;
+        });
     }
 
     public String getBody() {
@@ -61,19 +76,19 @@ public class Message extends WhatsAppObjectWithId {
     }
 
     public CompletableFuture<Message> reply(String text) {
-        return getClient().sendMessage(getContact().getId(), getId(), text);
+        return getClient().sendMessage(getSenderId(), getId(), text);
     }
 
     public CompletableFuture<MediaMessage> reply(File file) {
-        return getClient().sendMessage(getContact().getId(), file);
+        return getClient().sendMessage(getSenderId(), file);
     }
 
     public CompletableFuture<MediaMessage> reply(File file, String caption) {
-        return getClient().sendMessage(getContact().getId(), getId(), file, caption);
+        return getClient().sendMessage(getSenderId(), getId(), file, caption);
     }
 
     public CompletableFuture<MediaMessage> reply(File file, String fileName, String caption) {
-        return getClient().sendMessage(getContact().getId(), getId(), file, fileName, caption);
+        return getClient().sendMessage(getSenderId(), getId(), file, fileName, caption);
     }
 
     public CompletableFuture<Boolean> delete() {
@@ -95,9 +110,6 @@ public class Message extends WhatsAppObjectWithId {
     @Override
     protected void setJsonNode(JsonNode jsonNode) {
         super.setJsonNode(jsonNode);
-        if (jsonNode.has("senderObj")) {
-            this.contact = new Contact(getClient(), jsonNode.get("senderObj"));
-        }
         JsonNode oldId = jsonNode.get("oldId");
         if (oldId != null) {
             if (oldId.get("_serialized") != null) {

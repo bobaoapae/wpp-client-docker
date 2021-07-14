@@ -29,8 +29,15 @@ public class Chat extends WhatsAppObjectWithId {
         }
     }
 
-    public Contact getContact() {
-        return contact;
+    public CompletableFuture<Contact> getContact() {
+        if (contact != null) {
+            return CompletableFuture.completedFuture(contact);
+        }
+
+        return client.findContactById(this.getId()).thenApply(contact1 -> {
+            this.contact = contact1;
+            return this.contact;
+        });
     }
 
     public List<Message> getAllMessages() {
@@ -161,6 +168,5 @@ public class Chat extends WhatsAppObjectWithId {
     @Override
     protected void setJsonNode(JsonNode jsonNode) {
         super.setJsonNode(jsonNode);
-        this.contact = new Contact(getClient(), jsonNode.get("contact"));
     }
 }

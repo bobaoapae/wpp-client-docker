@@ -132,8 +132,9 @@ class WhatsAppClientTest {
                 AtomicBoolean updateChatMsg = new AtomicBoolean();
                 AtomicBoolean removeChatMsg = new AtomicBoolean();
                 assertNotNull(chat);
-                assertNotNull(chat.getContact());
-                assertEquals("4491050665", chat.getContact().getPhoneNumberNoFormatted());
+                var contact = chat.getContact().join();
+                assertNotNull(contact);
+                assertEquals("4491050665", contact.getPhoneNumberNoFormatted());
                 assertTrue(chat.addMessageListener(true, message -> {
                     newChatMsg.set(true);
                 }, EventType.ADD).join());
@@ -188,8 +189,9 @@ class WhatsAppClientTest {
                     newChatMsg2.get(3, TimeUnit.MINUTES);
                     newChatMsg3.get(3, TimeUnit.MINUTES);
                 });
-                File profilePic = chat.getContact().getProfilePic().join();
-                File profilePicFull = chat.getContact().getProfilePic(true).join();
+                contact = chat.getContact().join();
+                File profilePic = contact.getProfilePic().join();
+                File profilePicFull = contact.getProfilePic(true).join();
                 assertNotNull(profilePic);
                 assertNotNull(profilePicFull);
                 assertNotNull(chat.sendMessage(profilePic, "Foto de Perfil").join());
