@@ -153,61 +153,6 @@ public class WhatsAppClient {
         return whatsAppWsClient.findMessage(id);
     }
 
-    public CompletableFuture<Message> sendMessage(String chatId, String text) {
-        return sendMessage(chatId, "", text);
-    }
-
-    public CompletableFuture<Message> sendMessage(String chatId, String quotedId, String text) {
-        SendMessageRequest sendMessageRequest = new SendMessageRequest();
-        sendMessageRequest.setMessage(text);
-        sendMessageRequest.setChatId(chatId);
-        sendMessageRequest.setQuotedMsg(quotedId);
-        return sendMessage(sendMessageRequest);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, File file) {
-        return sendMessage(chatId, "", file, "");
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, File file, String caption) {
-        return sendMessage(chatId, "", file, caption);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, File file) {
-        return sendMessage(chatId, quotedId, file, "");
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, File file, String caption) {
-        return sendMessage(chatId, quotedId, file, file.getName(), caption);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, File file, String fileName, String caption) {
-        return whatsAppWsClient.uploadFile(fileName, file).thenCompose(s -> {
-            return sendMessage(chatId, quotedId, s, caption).thenApply(message -> {
-                return message;
-            });
-        });
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, String fileBase64, String fileName, String caption) {
-        return whatsAppWsClient.uploadFile(fileName, fileBase64).thenCompose(s -> {
-            return sendMessage(chatId, quotedId, s, caption).thenApply(message -> {
-                return message;
-            });
-        });
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String chatId, String quotedId, String uploadedUUID, String caption) {
-        SendMessageRequest sendMessageRequest = new SendMessageRequest();
-        sendMessageRequest.setMessage(caption);
-        sendMessageRequest.setChatId(chatId);
-        sendMessageRequest.setQuotedMsg(quotedId);
-        sendMessageRequest.setFileUUID(uploadedUUID);
-        return sendMessage(sendMessageRequest).thenApply(message -> {
-            return (MediaMessage) message;
-        });
-    }
-
     public CompletableFuture<Message> sendMessage(SendMessageRequest sendMessageRequest) {
         return whatsAppWsClient.sendMessage(sendMessageRequest);
     }
@@ -309,6 +254,18 @@ public class WhatsAppClient {
 
     public CompletableFuture<Boolean> joinGroup(String inviteCode) {
         return whatsAppWsClient.joinGroup(inviteCode);
+    }
+
+    public CompletableFuture<String> uploadFile(String name, String base64) {
+        return whatsAppWsClient.uploadFile(name, base64);
+    }
+
+    public CompletableFuture<String> uploadFile(File file) {
+        return whatsAppWsClient.uploadFile(file.getName(), file);
+    }
+
+    public CompletableFuture<String> uploadFile(String name, File file) {
+        return whatsAppWsClient.uploadFile(name, file);
     }
 
     public CompletableFuture<String> getQrCode() {

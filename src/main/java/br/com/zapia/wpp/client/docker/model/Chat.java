@@ -4,7 +4,6 @@ import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -60,40 +59,13 @@ public class Chat extends WhatsAppObjectWithId {
         return getJsonNode().get("formattedTitle").asText();
     }
 
-    public CompletableFuture<Message> sendMessage(String text) {
-        return getClient().sendMessage(getId(), text);
-    }
-
-    public CompletableFuture<Message> sendMessage(String text, String quotedMsgId) {
-        return getClient().sendMessage(getId(), text, quotedMsgId);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(File file) {
-        return getClient().sendMessage(getId(), file);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String quotedMsgId, File file) {
-        return getClient().sendMessage(getId(), quotedMsgId, file);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(File file, String caption) {
-        return getClient().sendMessage(getId(), file, caption);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(File file, String fileName, String caption) {
-        return getClient().sendMessage(getId(), "", file, fileName, caption);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String quotedMsgId, File file, String caption) {
-        return getClient().sendMessage(getId(), quotedMsgId, file, caption);
-    }
-
-    public CompletableFuture<MediaMessage> sendMessage(String quotedMsgId, File file, String fileName, String caption) {
-        return getClient().sendMessage(getId(), quotedMsgId, file, fileName, caption);
+    public CompletableFuture<Message> sendMessage(Consumer<SendMessageRequest.Builder> sendMessageRequestConsumer) {
+        var builder = new SendMessageRequest.Builder(getId());
+        sendMessageRequestConsumer.accept(builder);
+        return sendMessage(builder.build());
     }
 
     public CompletableFuture<Message> sendMessage(SendMessageRequest sendMessageRequest) {
-        sendMessageRequest.setChatId(getId());
         return getClient().sendMessage(sendMessageRequest);
     }
 

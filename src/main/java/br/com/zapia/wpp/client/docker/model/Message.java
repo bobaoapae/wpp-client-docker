@@ -3,7 +3,6 @@ package br.com.zapia.wpp.client.docker.model;
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.io.File;
 import java.util.concurrent.CompletableFuture;
 
 public class Message extends WhatsAppObjectWithId {
@@ -73,22 +72,6 @@ public class Message extends WhatsAppObjectWithId {
 
     public boolean isRevoked() {
         return getType().equals("revoked");
-    }
-
-    public CompletableFuture<Message> reply(String text) {
-        return getClient().sendMessage(getSenderId(), getId(), text);
-    }
-
-    public CompletableFuture<MediaMessage> reply(File file) {
-        return getClient().sendMessage(getSenderId(), file);
-    }
-
-    public CompletableFuture<MediaMessage> reply(File file, String caption) {
-        return getClient().sendMessage(getSenderId(), getId(), file, caption);
-    }
-
-    public CompletableFuture<MediaMessage> reply(File file, String fileName, String caption) {
-        return getClient().sendMessage(getSenderId(), getId(), file, fileName, caption);
     }
 
     public CompletableFuture<Boolean> delete() {

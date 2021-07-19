@@ -1,7 +1,7 @@
 package br.com.zapia.wpp.client.docker;
 
 import br.com.zapia.wpp.client.docker.model.*;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -12,62 +12,29 @@ import java.io.File;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@TestMethodOrder(value = MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WhatsAppClientTest {
 
     private JLabel label;
     private WhatsAppClient whatsAppClient;
-
+    private Chat chatTest;
+    private Contact contactTest;
 
     @Test
-    void start() {
-        CompletableFuture<Void> init = new CompletableFuture();
-        CompletableFuture<Void> qrCode = new CompletableFuture();
-        CompletableFuture<Void> driverUpdate = new CompletableFuture();
-        CompletableFuture<Void> error = new CompletableFuture();
-
-        AtomicBoolean newChat = new AtomicBoolean();
-        AtomicBoolean removeChat = new AtomicBoolean();
-        AtomicBoolean updateChat = new AtomicBoolean();
-        AtomicBoolean removeMessage = new AtomicBoolean();
-        AtomicBoolean newMessage = new AtomicBoolean();
-        AtomicBoolean updateMessage = new AtomicBoolean();
-
-        AtomicBoolean initReceived = new AtomicBoolean();
+    @Order(-1)
+    void initClient() {
+        CompletableFuture<Void> init = new CompletableFuture<>();
+        CompletableFuture<Void> qrCode = new CompletableFuture<>();
+        CompletableFuture<Void> driverUpdate = new CompletableFuture<>();
 
         Runnable onInit = () -> {
             System.out.println("init");
             init.complete(null);
-            initReceived.set(true);
-            whatsAppClient.addUpdateMessageListener(message -> {
-                System.out.println("updateMsg");
-                updateMessage.set(true);
-            });
-            whatsAppClient.addRemoveMessageListener(message -> {
-                System.out.println("removeMsg");
-                removeMessage.set(true);
-            });
-            whatsAppClient.addNewMessageListener(message -> {
-                System.out.println("newMsg");
-                newMessage.set(true);
-            });
-
-            whatsAppClient.addUpdateChatListener(chat -> {
-                System.out.println("updateChat");
-                updateChat.set(true);
-            });
-            whatsAppClient.addNewChatListener(chat -> {
-                System.out.println("newChat");
-                newChat.set(true);
-            });
-            whatsAppClient.addRemoveChatListener(chat -> {
-                System.out.println("removeChat");
-                removeChat.set(true);
-            });
         };
 
         Consumer<String> onNeedQrCode = (base64) -> {
@@ -104,37 +71,195 @@ class WhatsAppClientTest {
             driverUpdate.complete(null);
         };
 
-        Consumer<Throwable> onError = (throwable) -> {
-            throwable.printStackTrace();
-            error.complete(null);
-        };
-
-
         WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "localhost").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
         builder.onInit(onInit)
-                .onError(onError)
                 .onUpdateDriverState(onUpdateDriverState)
-                .onNeedQrCode(onNeedQrCode)
-                .onWsDisconnect((code, reason, remote) -> {
-                    if (remote) {
-                        assertTrue(whatsAppClient.start().orTimeout(3, TimeUnit.MINUTES).join());
+                .onNeedQrCode(onNeedQrCode);
+        whatsAppClient = builder.builder();
+        assertTrue(whatsAppClient.start().orTimeout(1, TimeUnit.MINUTES).join());
+        CompletableFuture.allOf(init, CompletableFuture.anyOf(init, qrCode), driverUpdate).orTimeout(2, TimeUnit.MINUTES).join();
+    }
+
+    @BeforeEach
+    void updateTestChat() {
+        if (chatTest != null) {
+            chatTest.update().orTimeout(30, TimeUnit.SECONDS).join();
+        }
+    }
+
+    @Test
+    @Order(0)
+    void getTestChat() {
+        chatTest = whatsAppClient.findChatByNumber("5544997258328").orTimeout(10, TimeUnit.SECONDS).join();
+        assertNotNull(chatTest);
+    }
+
+    @Test
+    @Order(1)
+    void getContactTest() {
+        contactTest = chatTest.getContact().orTimeout(10, TimeUnit.SECONDS).join();
+        assertNotNull(contactTest);
+        assertEquals("4497258328", contactTest.getPhoneNumberNoFormatted());
+    }
+
+    @Test
+    @Order(2)
+    void sendSimpleMsg() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withText("test")).join();
+        assertNotNull(sendMsg);
+        assertEquals("test", sendMsg.getBody());
+    }
+
+    @Test
+    @Order(3)
+    void sendSimpleMsgWithMention() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withText("test").withMentionToContact(contactTest.getId())).join();
+        assertNotNull(sendMsg);
+        assertEquals("test", sendMsg.getBody());
+    }
+
+    @Test
+    @Order(4)
+    void sendSimpleMsgQuoted() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withText("test").withQuotedMsg(chatTest.getLastMsg().getId())).join();
+        assertNotNull(sendMsg);
+        assertEquals("test", sendMsg.getBody());
+    }
+
+    @Test
+    @Order(5)
+    void sendLocation() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353)).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof GeoMessage);
+    }
+
+    @Test
+    @Order(6)
+    void sendLocationWithName() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353, locationBuilder -> locationBuilder.withName("name"))).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof GeoMessage);
+    }
+
+    @Test
+    @Order(7)
+    void sendLocationWithNameAndDescription() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353, locationBuilder -> locationBuilder.withName("name").withDescription("description"))).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof GeoMessage);
+    }
+
+    @Test
+    @Order(8)
+    void sendVCard() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withVCard("João", "5544997258328")).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof VCardMessage);
+    }
+
+    @Test
+    @Order(9)
+    void sendFile() {
+        var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID)).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof MediaMessage);
+    }
+
+    @Test
+    @Order(10)
+    void sendFileWithCaption() {
+        var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withCaption("caption"))).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof MediaMessage);
+        assertEquals("caption", ((MediaMessage) sendMsg).getCaption());
+    }
+
+    @Test
+    @Order(11)
+    void sendFileAsDocument() {
+        var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withForceDocument(true))).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof MediaMessage);
+    }
+
+    @Test
+    @Order(12)
+    void sendFileAsSticker() {
+        var uploadedUUID = whatsAppClient.uploadFile("image.webp", new File("filesTest/image.png")).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID)).join();
+        assertNotNull(sendMsg);
+        assertTrue(sendMsg instanceof MediaMessage);
+    }
+
+    @Test
+    @Order(13)
+    void sendWebSite() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withWebSite("https://zapia.com.br")).join();
+        assertNotNull(sendMsg);
+    }
+
+    @Test
+    @Order(14)
+    void sendButtons() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withButtons("Title", "Footer", buttonsBuilder -> buttonsBuilder.withButton("Button 1").withButton("Button 2").withButton("Button 3")).withText("Content")).join();
+        assertNotNull(sendMsg);
+    }
+
+    @Test
+    @Order(15)
+    void sendList() {
+        var sendMsg = chatTest.sendMessage(builder -> builder.withList(listBuilder -> {
+            listBuilder
+                    .withTitle("Title")
+                    .withDescription("Description")
+                    .withFooter("Footer")
+                    .withButtonText("Button Text");
+            for (int x = 0; x < 10; x++) {
+                listBuilder.withSection("Section " + x, sectionBuilder -> {
+                    for (int y = 0; y < 20; y++) {
+                        sectionBuilder.withRow("Row " + y);
                     }
                 });
-        whatsAppClient = builder.builder();
-        assertTrue(whatsAppClient.start().orTimeout(3, TimeUnit.MINUTES).join());
-        assertDoesNotThrow(() -> {
-            CompletableFuture.allOf(init, CompletableFuture.anyOf(init, qrCode), driverUpdate).orTimeout(5, TimeUnit.MINUTES).join();
-        });
+            }
+        })).join();
+        assertNotNull(sendMsg);
+    }
+
+    @Test
+    @Order(99)
+    void clearChat() {
+        assertTrue(chatTest.clearMessages(false).join());
+    }
+
+    @Test
+    @Order(100)
+    void checkClearChat() {
+        assertTrue(chatTest.getAllMessages().size() <= 3);
+    }
+
+    @Test
+    @Order(101)
+    void deleteChat() {
+        assertTrue(chatTest.delete().orTimeout(30, TimeUnit.SECONDS).join());
+    }
+
+   /* @Test
+    void start() {
+
         assertDoesNotThrow(() -> {
             if (initReceived.get()) {
-                Chat chat = whatsAppClient.findChatById("554491050665@c.us").join();
+                Chat chat = whatsAppClient.findChatByNumber("5544997258328").join();
                 AtomicBoolean newChatMsg = new AtomicBoolean();
                 AtomicBoolean updateChatMsg = new AtomicBoolean();
                 AtomicBoolean removeChatMsg = new AtomicBoolean();
                 assertNotNull(chat);
                 var contact = chat.getContact().join();
                 assertNotNull(contact);
-                assertEquals("4491050665", contact.getPhoneNumberNoFormatted());
+                assertEquals("4497258328", contact.getPhoneNumberNoFormatted());
                 assertTrue(chat.addMessageListener(true, message -> {
                     newChatMsg.set(true);
                 }, EventType.ADD).join());
@@ -144,10 +269,10 @@ class WhatsAppClientTest {
                 assertTrue(chat.addMessageListener(true, message -> {
                     removeChatMsg.set(true);
                 }, EventType.REMOVE).join());
-                Message message = chat.sendMessage("teste").join();
+                Message message = chat.sendMessage(messageBuilder -> messageBuilder.withText("test")).join();
                 assertNotNull(message);
-                assertEquals("teste", message.getBody());
-                Message reply = message.reply("reply").join();
+                assertEquals("test", message.getBody());
+                Message reply = chat.sendMessage(messageBuilder -> messageBuilder.withQuotedMsg(message.getId()).withText("reply")).join();
                 assertNotNull(reply);
                 assertEquals("reply", reply.getBody());
                 assertTrue(message.revoke().join());
@@ -160,29 +285,35 @@ class WhatsAppClientTest {
                 CompletableFuture<Void> newChatMsg3 = new CompletableFuture<>();
                 whatsAppClient.addNewChatListener(chat1 -> {
                     assertDoesNotThrow(() -> {
-                        chat1.update().join();
-                        Message lastMsg = chat1.getLastMsg();
-                        assertNotNull(lastMsg);
-                        assertEquals("teste", lastMsg.getBody());
-                        MediaMessage caption = lastMsg.reply(new File("pom.xml"), "caption").join();
-                        assertNotNull(caption);
-                        assertEquals("caption", caption.getCaption());
-                        chat1.addMessageListener(messages -> {
-                            var message1 = messages.get(messages.size() - 1);
-                            if (message1 instanceof MediaMessage) {
-                                File join = ((MediaMessage) message1).download().join();
-                                assertNotNull(join);
-                                MediaMessage join1 = message1.reply(join, join.getName().split("#")[0], "").join();
-                                assertNotNull(join1);
-                                newChatMsg3.complete(null);
-                            } else {
-                                assertEquals("teste", message1.getBody());
-                                Message join = message1.reply("Envie um arquivo para testar o download").join();
-                                assertNotNull(join);
-                                assertEquals("Envie um arquivo para testar o download", join.getBody());
-                                newChatMsg2.complete(null);
-                            }
-                        }, EventType.ADD);
+                        var contactChat = chat1.getContact().join();
+                        if (contactChat.getPhoneNumberNoFormatted().equals("4497258328")) {
+                            chat1.update().join();
+                            Message lastMsg = chat1.getLastMsg();
+                            assertNotNull(lastMsg);
+                            assertEquals("test", lastMsg.getBody());
+                            var idFileUploaded = whatsAppClient.uploadFile(new File("pom.xml")).join();
+                            Message caption = chat1.sendMessage(messageBuilder -> messageBuilder.withQuotedMsg(lastMsg.getId()).withFile(idFileUploaded, fileBuilder -> fileBuilder.withCaption("caption"))).join();
+                            assertTrue(caption instanceof MediaMessage);
+                            assertEquals("caption", ((MediaMessage) caption).getCaption());
+                            var result = chat1.addMessageListener(messages -> {
+                                var message1 = messages.get(messages.size() - 1);
+                                if (message1 instanceof MediaMessage) {
+                                    File join = ((MediaMessage) message1).download().join();
+                                    var id = whatsAppClient.uploadFile(join.getName().split("#")[0], join).join();
+                                    assertNotNull(join);
+                                    Message join1 = chat1.sendMessage(messageBuilder -> messageBuilder.withQuotedMsg(message1.getId()).withFile(id)).join();
+                                    assertNotNull(join1);
+                                    newChatMsg3.complete(null);
+                                } else {
+                                    assertEquals("teste", message1.getBody());
+                                    Message join = chat1.sendMessage(messageBuilder -> messageBuilder.withQuotedMsg(message1.getId()).withText("Send a file to test download functions")).join();
+                                    assertNotNull(join);
+                                    assertEquals("Send a file to test download functions", join.getBody());
+                                    newChatMsg2.complete(null);
+                                }
+                            }, EventType.ADD).join();
+                            assertTrue(result);
+                        }
                     });
                 });
                 assertDoesNotThrow(() -> {
@@ -192,10 +323,12 @@ class WhatsAppClientTest {
                 contact = chat.getContact().join();
                 File profilePic = contact.getProfilePic().join();
                 File profilePicFull = contact.getProfilePic(true).join();
+                var idProfilePicUpload = whatsAppClient.uploadFile(profilePic).join();
+                var idProfilePicFullUpload = whatsAppClient.uploadFile(profilePicFull).join();
                 assertNotNull(profilePic);
                 assertNotNull(profilePicFull);
-                assertNotNull(chat.sendMessage(profilePic, "Foto de Perfil").join());
-                assertNotNull(chat.sendMessage(profilePicFull, "Foto de Perfil Full").join());
+                assertNotNull(chat.sendMessage(messageBuilder -> messageBuilder.withFile(idProfilePicUpload, fileBuilder -> fileBuilder.withCaption("Profile Pic"))).join());
+                assertNotNull(chat.sendMessage(messageBuilder -> messageBuilder.withFile(idProfilePicFullUpload, fileBuilder -> fileBuilder.withCaption("Profile Pic Full"))).join());
                 assertTrue(whatsAppClient.getAllChats().join().size() >= 1);
                 assertTrue(whatsAppClient.getAllContacts().join().size() >= 1);
                 Thread.sleep(3000);
@@ -216,5 +349,5 @@ class WhatsAppClientTest {
                 assertTrue(removeMessage.get());
             }
         });
-    }
+    }*/
 }
