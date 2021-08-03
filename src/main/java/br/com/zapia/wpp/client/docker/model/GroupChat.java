@@ -12,7 +12,7 @@ public class GroupChat extends Chat {
         super(client, jsonNode);
     }
 
-    public CompletableFuture<List<Contact>> getAllParticipants() {
+    public CompletableFuture<List<GroupParticipant>> getAllParticipants() {
         return client.getGroupParticipants(getId());
     }
 }

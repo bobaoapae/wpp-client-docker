@@ -26,6 +26,7 @@ class WhatsAppClientTest {
     private WhatsAppClient whatsAppClient;
     private Chat chatTest;
     private Contact contactTest;
+    private GroupChat groupChatTest;
 
     @Test
     @Order(-1)

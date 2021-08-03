@@ -149,7 +149,7 @@ public class WhatsAppClient {
         return whatsAppWsClient.getAllQuickReplies();
     }
 
-    public CompletableFuture<List<Contact>> getGroupParticipants(String groupId) {
+    public CompletableFuture<List<GroupParticipant>> getGroupParticipants(String groupId) {
         return whatsAppWsClient.getGroupParticipants(groupId);
     }
 
