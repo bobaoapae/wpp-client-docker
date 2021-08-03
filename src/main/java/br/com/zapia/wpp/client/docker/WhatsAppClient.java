@@ -149,6 +149,10 @@ public class WhatsAppClient {
         return whatsAppWsClient.getAllQuickReplies();
     }
 
+    public CompletableFuture<List<Contact>> getGroupParticipants(String groupId) {
+        return whatsAppWsClient.getGroupParticipants(groupId);
+    }
+
     public CompletableFuture<Message> findMessage(String id) {
         return whatsAppWsClient.findMessage(id);
     }
