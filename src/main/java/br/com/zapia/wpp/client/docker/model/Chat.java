@@ -2,30 +2,38 @@ package br.com.zapia.wpp.client.docker.model;
 
 import br.com.zapia.wpp.api.model.payloads.SendMessageRequest;
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-public class Chat extends WhatsAppObjectWithId {
+public class Chat extends WhatsAppObjectWithId<Chat> {
+
+    private String name;
+    private int unreadMessages;
+    private int mute;
+    private int pin;
+    private boolean isReadOnly;
+    private final Map<String, Message> messages;
 
     private Contact contact;
 
-    protected Chat(WhatsAppClient client, JsonNode jsonNode) {
-        super(client, jsonNode);
+    public static Chat build(WhatsAppClient client, JsonObject jsonObject) {
+        if (jsonObject.get("id").getAsString().endsWith("@g.us")) {
+            //TODO: Group Chat
+            return BaseWhatsAppObject.createWhatsAppObject(Chat.class, client, jsonObject);
+        } else {
+            return BaseWhatsAppObject.createWhatsAppObject(Chat.class, client, jsonObject);
+        }
     }
 
-    public static Chat build(WhatsAppClient client, JsonNode jsonNode) {
-        switch (jsonNode.get("kind").textValue()) {
-            case "group":
-                return new GroupChat(client, jsonNode);
-            default:
-                return new Chat(client, jsonNode);
-        }
+    protected Chat(WhatsAppClient client, JsonObject jsonObject) {
+        super(client, jsonObject);
+        messages = new LinkedHashMap<>();
     }
 
     public CompletableFuture<Contact> getContact() {
@@ -39,24 +47,24 @@ public class Chat extends WhatsAppObjectWithId {
         });
     }
 
-    public List<Message> getAllMessages() {
-        List<Message> msgs = new ArrayList<>();
-        for (JsonNode msg : getJsonNode().get("msgs")) {
-            msgs.add(Message.build(getClient(), msg));
+    public Map<String, Message> getMessages() {
+        synchronized (messages) {
+            return messages;
         }
-        return Collections.unmodifiableList(msgs);
     }
 
     public Message getLastMsg() {
-        List<Message> allMessages = getAllMessages();
-        if (!allMessages.isEmpty()) {
-            return allMessages.get(allMessages.size() - 1);
+        synchronized (messages) {
+            var allMessages = messages.values().stream().toList();
+            if (!allMessages.isEmpty()) {
+                return allMessages.get(allMessages.size() - 1);
+            }
+            return null;
         }
-        return null;
     }
 
     public String getFormattedTitle() {
-        return getJsonNode().get("formattedTitle").asText();
+        return getJsonObject().get("name").getAsString();
     }
 
     public CompletableFuture<Message> sendMessage(Consumer<SendMessageRequest.Builder> sendMessageRequestConsumer) {
@@ -121,24 +129,37 @@ public class Chat extends WhatsAppObjectWithId {
         return getClient().clearChatMessages(getId(), keepFavorites);
     }
 
-    public CompletableFuture<Boolean> addMessageListener(Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
-        return addMessageListener(false, messageConsumer, eventType, properties);
-    }
-
-    public CompletableFuture<Boolean> addMessageListener(boolean includeMe, Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
-        return getClient().addChatMessageListener(getId(), includeMe, messageConsumer, eventType, properties);
-    }
-
     public CompletableFuture<Void> update() {
-        return getClient().findChatById(getId()).thenAccept(this::update);
-    }
-
-    public void update(Chat chat) {
-        this.setJsonNode(chat.getJsonNode());
+        return getClient().findChatById(getId()).thenAccept(this::updateFromOther);
     }
 
     @Override
-    protected void setJsonNode(JsonNode jsonNode) {
-        super.setJsonNode(jsonNode);
+    void build() {
+        super.build();
+        name = jsonObject.get("name").getAsString();
+        unreadMessages = jsonObject.get("unreadMessages").getAsInt();
+        mute = jsonObject.get("unreadMessages").getAsInt();
+        pin = jsonObject.get("unreadMessages").getAsInt();
+        isReadOnly = jsonObject.get("isReadOnly").getAsBoolean();
+        var msgs = getJsonObject().get("messages").getAsJsonObject();
+        synchronized (messages) {
+            for (String msgId : msgs.keySet()) {
+                messages.put(msgId, new Message(getClient(), msgs.get(msgId).getAsJsonObject()));
+            }
+        }
+    }
+
+    @Override
+    protected void update(Chat baseWhatsAppObject) {
+        super.update(baseWhatsAppObject);
+        name = baseWhatsAppObject.name;
+        unreadMessages = baseWhatsAppObject.unreadMessages;
+        mute = baseWhatsAppObject.mute;
+        pin = baseWhatsAppObject.pin;
+        isReadOnly = baseWhatsAppObject.isReadOnly;
+        synchronized (messages) {
+            messages.clear();
+            messages.putAll(baseWhatsAppObject.messages);
+        }
     }
 }

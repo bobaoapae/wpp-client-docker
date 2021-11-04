@@ -117,10 +117,6 @@ public class WhatsAppClient {
         whatsAppWsClient.addRemoveMessageListener(messageConsumer);
     }
 
-    public CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
-        return whatsAppWsClient.addChatMessageListener(chatId, includeMe, messageConsumer, eventType, properties);
-    }
-
     public CompletableFuture<Chat> findChatById(String id) {
         return whatsAppWsClient.findChatById(id);
     }
@@ -147,10 +143,6 @@ public class WhatsAppClient {
 
     public CompletableFuture<List<QuickReply>> getAllQuickReplies() {
         return whatsAppWsClient.getAllQuickReplies();
-    }
-
-    public CompletableFuture<List<GroupParticipant>> getGroupParticipants(String groupId) {
-        return whatsAppWsClient.getGroupParticipants(groupId);
     }
 
     public CompletableFuture<Message> findMessage(String id) {

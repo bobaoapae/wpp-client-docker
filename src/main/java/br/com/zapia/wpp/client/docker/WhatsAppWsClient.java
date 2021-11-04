@@ -4,7 +4,7 @@ import br.com.zapia.wpp.api.model.handlersWebSocket.EventWebSocket;
 import br.com.zapia.wpp.api.model.payloads.*;
 import br.com.zapia.wpp.client.docker.model.*;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.*;
 import okhttp3.*;
 import org.apache.tika.Tika;
 import org.java_websocket.client.WebSocketClient;
@@ -22,16 +22,21 @@ import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 class WhatsAppWsClient extends WebSocketClient {
+
+    protected static final Logger logger = Logger.getLogger(WhatsAppWsClient.class.getName());
+
     private final Map<UUID, WsMessageSend> wsEvents;
     private final Map<UUID, List<WebSocketResponseFrame>> wsPartialEvents;
-    private final Map<UUID, Consumer<List<Message>>> chatsMessageListener;
-    private final ObjectMapper objectMapper;
+    private final Gson gson;
 
     private final Runnable onInit;
     private final WhatsAppClient whatsAppClient;
@@ -64,8 +69,7 @@ class WhatsAppWsClient extends WebSocketClient {
         this.endPointAddress = uri.getHost();
         this.wsEvents = new ConcurrentHashMap<>();
         this.wsPartialEvents = new ConcurrentHashMap<>();
-        this.chatsMessageListener = new ConcurrentHashMap<>();
-        this.objectMapper = new ObjectMapper();
+        this.gson = new GsonBuilder().registerTypeAdapter(LocalDateTime.class, new LocalDateTimeGson()).create();
         this.onInit = onInit;
         this.whatsAppClient = whatsAppClient;
         this.onNeedQrCode = onNeedQrCode;
@@ -96,10 +100,11 @@ class WhatsAppWsClient extends WebSocketClient {
             WebSocketRequest webSocketRequest = new WebSocketRequest();
             webSocketRequest.setTag(uuid.toString());
             if (wsMessageSend.getPayLoad().getPayload() != null && !(wsMessageSend.getPayLoad().getPayload() instanceof String)) {
-                wsMessageSend.getPayLoad().setPayload(objectMapper.writeValueAsString(wsMessageSend.getPayLoad().getPayload()));
+                Object payload = wsMessageSend.getPayLoad().getPayload();
+                wsMessageSend.getPayLoad().setPayload(gson.toJson(payload));
             }
             webSocketRequest.setWebSocketRequestPayLoad(wsMessageSend.getPayLoad());
-            String serialized = objectMapper.writeValueAsString(webSocketRequest);
+            String serialized = gson.toJson(webSocketRequest);
             CompletableFuture<WebSocketResponse> response = wsMessageSend.getWsEvent();
             response.whenComplete((response1, throwable) -> {
                 wsEvents.remove(uuid);
@@ -121,6 +126,7 @@ class WhatsAppWsClient extends WebSocketClient {
             }
             return response;
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "SendWsMessage", e);
             return CompletableFuture.failedFuture(e);
         }
     }
@@ -130,8 +136,8 @@ class WhatsAppWsClient extends WebSocketClient {
         if (wsEvents.containsKey(uuid)) {
             WsMessageSend wsMessageSend = wsEvents.get(uuid);
             try {
-                WebSocketResponse response = objectMapper.readValue(payload, WebSocketResponse.class);
-                if (response instanceof WebSocketResponseFrame) {
+                WebSocketResponse response = gson.fromJson(payload, WebSocketResponse.class);
+                /*if (response instanceof WebSocketResponseFrame) {
                     if (!wsPartialEvents.containsKey(uuid)) {
                         wsPartialEvents.put(uuid, new CopyOnWriteArrayList<>());
                     }
@@ -150,28 +156,23 @@ class WhatsAppWsClient extends WebSocketClient {
                     }
                 } else {
                     processWsResponse(wsMessageSend, response);
-                }
+                }*/
+                processWsResponse(wsMessageSend, response);
             } catch (IOException e) {
                 wsMessageSend.getWsEvent().completeExceptionally(e);
-            }
-        } else if (chatsMessageListener.containsKey(uuid)) {
-            try {
-                chatsMessageListener.get(uuid).accept(Arrays.asList(Message.build(whatsAppClient, objectMapper.readTree(payload))));
-            } catch (IOException e) {
-                onError(new RuntimeException(e));
             }
         }
     }
 
     private void processWsResponse(WsMessageSend wsMessageSend, WebSocketResponse response) throws IOException {
-        if (response.getResponse() instanceof LinkedHashMap || response.getResponse() instanceof List) {
-            response.setResponse(objectMapper.readTree(objectMapper.writeValueAsString(response.getResponse())));
+        if (response.getResponse() instanceof Map || response.getResponse() instanceof List) {
+            response.setResponse(gson.toJsonTree(response.getResponse()));
         } else if (response.getResponse() instanceof String) {
             try {
-                JsonNode jsonNode = objectMapper.readTree((String) response.getResponse());
-                response.setResponse(jsonNode);
+                var jsonElement = gson.fromJson((String) response.getResponse(), JsonElement.class);
+                response.setResponse(jsonElement);
             } catch (Exception e) {
-
+                //ignore
             }
         }
         if (response.getStatus() == 200 || response.getStatus() == 201 || response.getStatus() == 404) {
@@ -198,7 +199,7 @@ class WhatsAppWsClient extends WebSocketClient {
                     if (!response.isSuccessful()) {
                         throw new RuntimeException(response.body().string());
                     } else {
-                        return objectMapper.readValue(response.body().string(), StatsResponse.class);
+                        return gson.fromJson(response.body().string(), StatsResponse.class);
                     }
                 }
             } catch (Exception e) {
@@ -231,32 +232,13 @@ class WhatsAppWsClient extends WebSocketClient {
         this.removeMessageListeners.add(messageConsumer);
     }
 
-    protected CompletableFuture<Boolean> addChatMessageListener(String chatId, boolean includeMe, Consumer<List<Message>> messageConsumer, EventType eventType, String... properties) {
-        WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
-        payLoad.setEvent(EventWebSocket.AddChatMessageListener);
-        AddChatMessageListenerRequest request = new AddChatMessageListenerRequest();
-        request.setChatId(chatId);
-        request.setIncludeMe(includeMe);
-        request.setEventType(eventType.name());
-        request.setProperties(properties);
-        payLoad.setPayload(request);
-        return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            if (webSocketResponse.getStatus() == 200) {
-                this.chatsMessageListener.put(UUID.fromString((String) webSocketResponse.getResponse()), messageConsumer);
-                return true;
-            }
-
-            return false;
-        });
-    }
-
     protected CompletableFuture<Chat> findChatById(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent(EventWebSocket.FindChat);
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return Chat.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return Chat.build(whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -269,7 +251,7 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(number);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return Chat.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return Chat.build(whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -282,7 +264,7 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return new Contact(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return BaseWhatsAppObject.createWhatsAppObject(Contact.class, whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -295,7 +277,7 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(number);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return new Contact(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return BaseWhatsAppObject.createWhatsAppObject(Contact.class, whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -307,9 +289,9 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setEvent(EventWebSocket.GetAllChats);
         return sendWsMessage(payLoad).thenApply(response -> {
             List<Chat> chats = new ArrayList<>();
-            JsonNode jsonNode = (JsonNode) response.getResponse();
-            jsonNode.forEach(jsonNode1 -> {
-                chats.add(Chat.build(whatsAppClient, jsonNode1));
+            var jsonArray = (JsonArray) response.getResponse();
+            jsonArray.forEach(jsonElement -> {
+                chats.add(Chat.build(whatsAppClient, jsonElement.getAsJsonObject()));
             });
             return chats;
         });
@@ -320,9 +302,9 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setEvent(EventWebSocket.GetAllContacts);
         return sendWsMessage(payLoad).thenApply(response -> {
             List<Contact> contacts = new ArrayList<>();
-            JsonNode jsonNode = (JsonNode) response.getResponse();
-            jsonNode.forEach(jsonNode1 -> {
-                contacts.add(new Contact(whatsAppClient, jsonNode1));
+            var jsonArray = (JsonArray) response.getResponse();
+            jsonArray.forEach(jsonElement -> {
+                contacts.add(BaseWhatsAppObject.createWhatsAppObject(Contact.class, whatsAppClient, jsonElement.getAsJsonObject()));
             });
             return contacts;
         });
@@ -333,15 +315,15 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setEvent(EventWebSocket.GetAllQuickReplies);
         return sendWsMessage(payLoad).thenApply(response -> {
             var result = new ArrayList<QuickReply>();
-            JsonNode jsonNode = (JsonNode) response.getResponse();
-            jsonNode.forEach(jsonNode1 -> {
-                result.add(new QuickReply(whatsAppClient, jsonNode1));
+            var jsonArray = (JsonArray) response.getResponse();
+            jsonArray.forEach(jsonElement -> {
+                result.add(BaseWhatsAppObject.createWhatsAppObject(QuickReply.class, whatsAppClient, jsonElement.getAsJsonObject()));
             });
             return result;
         });
     }
 
-    protected CompletableFuture<List<GroupParticipant>> getGroupParticipants(String groupId) {
+    /*protected CompletableFuture<List<GroupParticipant>> getGroupParticipants(String groupId) {
         var payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent(EventWebSocket.GetGroupParticipants);
         payLoad.setPayload(groupId);
@@ -353,7 +335,7 @@ class WhatsAppWsClient extends WebSocketClient {
             });
             return result;
         });
-    }
+    }*/
 
     protected CompletableFuture<Message> findMessage(String id) {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
@@ -361,7 +343,7 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(id);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return Message.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return BaseWhatsAppObject.createWhatsAppObject(Message.class, whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -374,7 +356,7 @@ class WhatsAppWsClient extends WebSocketClient {
         payLoad.setPayload(sendMessageRequest);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             if (webSocketResponse.getStatus() == 200) {
-                return Message.build(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+                return BaseWhatsAppObject.createWhatsAppObject(Message.class, whatsAppClient, (JsonObject) webSocketResponse.getResponse());
             }
 
             return null;
@@ -574,10 +556,10 @@ class WhatsAppWsClient extends WebSocketClient {
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
             List<Message> messages = new ArrayList<>();
             if (webSocketResponse.getStatus() == 200 && webSocketResponse.getResponse() != null) {
-                JsonNode jsonNode = (JsonNode) webSocketResponse.getResponse();
-                if (!jsonNode.isEmpty()) {
-                    for (JsonNode node : jsonNode) {
-                        messages.add(Message.build(whatsAppClient, node));
+                var jsonArray = (JsonArray) webSocketResponse.getResponse();
+                if (!jsonArray.isEmpty()) {
+                    for (var node : jsonArray) {
+                        messages.add(BaseWhatsAppObject.createWhatsAppObject(Message.class, whatsAppClient, node.getAsJsonObject()));
                     }
                 }
             }
@@ -632,7 +614,7 @@ class WhatsAppWsClient extends WebSocketClient {
         WebSocketRequestPayLoad payLoad = new WebSocketRequestPayLoad();
         payLoad.setEvent(EventWebSocket.GetSelfInfo);
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            return new SelfInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse());
+            return new SelfInfo(whatsAppClient, (JsonObject) webSocketResponse.getResponse());
         });
     }
 
@@ -673,7 +655,7 @@ class WhatsAppWsClient extends WebSocketClient {
             payLoad.setPayload(inviteCode);
         }
         return sendWsMessage(payLoad).thenApply(webSocketResponse -> {
-            return new GroupInviteLinkInfo(whatsAppClient, (JsonNode) webSocketResponse.getResponse(), inviteCode.replaceAll("(?i)https://chat.whatsapp.com/", ""));
+            return new GroupInviteLinkInfo(whatsAppClient, (JsonObject) webSocketResponse.getResponse(), inviteCode.replaceAll("(?i)https://chat.whatsapp.com/", ""));
         });
     }
 
@@ -743,7 +725,7 @@ class WhatsAppWsClient extends WebSocketClient {
                         onUpdateDriverState.accept(driverState);
                     }
                 }));
-                if (driverState == DriverState.LOGGED) {
+                if (driverState == DriverState.CONNECTED) {
                     executorService.submit(runnableFactory.apply(() -> {
                         resetListeners();
                         if (onInit != null) {
@@ -756,8 +738,8 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (Consumer<Chat> newChatListener : newChatListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            newChatListener.accept(Chat.build(whatsAppClient, objectMapper.readTree(split[1])));
-                        } catch (IOException e) {
+                            newChatListener.accept(Chat.build(whatsAppClient, gson.fromJson(split[1], JsonObject.class)));
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -767,8 +749,8 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (Consumer<Chat> updateChatListener : updateChatListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            updateChatListener.accept(Chat.build(whatsAppClient, objectMapper.readTree(split[1])));
-                        } catch (IOException e) {
+                            updateChatListener.accept(Chat.build(whatsAppClient, gson.fromJson(split[1], JsonObject.class)));
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -778,8 +760,8 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (Consumer<Chat> removeChatListener : removeChatListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            removeChatListener.accept(Chat.build(whatsAppClient, objectMapper.readTree(split[1])));
-                        } catch (IOException e) {
+                            removeChatListener.accept(Chat.build(whatsAppClient, gson.fromJson(split[1], JsonObject.class)));
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -789,9 +771,9 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (var removeMessageListener : removeMessageListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            var jsonNode = objectMapper.readTree(split[1]);
+                            var jsonNode = gson.fromJson(split[1], JsonElement.class);
                             removeMessageListener.accept(buildMessages(jsonNode));
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -801,9 +783,9 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (var newMessageListener : newMessageListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            var jsonNode = objectMapper.readTree(split[1]);
+                            var jsonNode = gson.toJsonTree(split[1]);
                             newMessageListener.accept(buildMessages(jsonNode));
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -813,9 +795,9 @@ class WhatsAppWsClient extends WebSocketClient {
                 for (var updateMessageListener : updateMessageListeners) {
                     executorService.submit(runnableFactory.apply(() -> {
                         try {
-                            var jsonNode = objectMapper.readTree(split[1]);
+                            var jsonNode = gson.toJsonTree(split[1]);
                             updateMessageListener.accept(buildMessages(jsonNode));
-                        } catch (IOException e) {
+                        } catch (Exception e) {
                             onError(e);
                         }
                     }));
@@ -846,14 +828,14 @@ class WhatsAppWsClient extends WebSocketClient {
         }
     }
 
-    private List<Message> buildMessages(JsonNode jsonNode) {
+    private List<Message> buildMessages(JsonElement jsonElement) {
         var msgs = new ArrayList<Message>();
-        if (jsonNode.isArray()) {
-            jsonNode.forEach(jsonNode1 -> {
-                msgs.add(Message.build(whatsAppClient, jsonNode1));
+        if (jsonElement.isJsonArray()) {
+            jsonElement.getAsJsonArray().forEach(jsonNode1 -> {
+                msgs.add(BaseWhatsAppObject.createWhatsAppObject(Message.class, whatsAppClient, jsonNode1.getAsJsonObject()));
             });
         } else {
-            msgs.add(Message.build(whatsAppClient, jsonNode));
+            msgs.add(BaseWhatsAppObject.createWhatsAppObject(Message.class, whatsAppClient, jsonElement.getAsJsonObject()));
         }
         return msgs;
     }

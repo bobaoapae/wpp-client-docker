@@ -1,19 +1,19 @@
 package br.com.zapia.wpp.client.docker.model;
 
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 
-public class SelfInfo extends WhatsAppObject {
+public class SelfInfo extends WhatsAppObjectWithId {
 
-    public SelfInfo(WhatsAppClient client, JsonNode jsonNode) {
-        super(client, jsonNode);
+    public SelfInfo(WhatsAppClient client, JsonObject jsonObject) {
+        super(client, jsonObject);
     }
 
-    public Chat getMyChat() {
-        return new Chat(client, jsonNode.get("self"));
+    public String getPushName() {
+        return jsonObject.get("pushName").getAsString();
     }
 
     public boolean isBusiness() {
-        return jsonNode.get("isBusiness").asBoolean();
+        return jsonObject.get("isBusiness").getAsBoolean();
     }
 }

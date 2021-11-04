@@ -1,6 +1,9 @@
 package br.com.zapia.wpp.client.docker;
 
-import br.com.zapia.wpp.client.docker.model.*;
+import br.com.zapia.wpp.client.docker.model.Chat;
+import br.com.zapia.wpp.client.docker.model.Contact;
+import br.com.zapia.wpp.client.docker.model.DriverState;
+import br.com.zapia.wpp.client.docker.model.Message;
 import org.junit.jupiter.api.*;
 
 import javax.imageio.ImageIO;
@@ -26,7 +29,6 @@ class WhatsAppClientTest {
     private WhatsAppClient whatsAppClient;
     private Chat chatTest;
     private Contact contactTest;
-    private GroupChat groupChatTest;
 
     @Test
     @Order(-1)
@@ -74,7 +76,7 @@ class WhatsAppClientTest {
             driverUpdate.complete(null);
         };
 
-        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "localhost").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
+        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "localhost").withInsideDockerHostVolumeLocation(new File("").getAbsolutePath() + "/cache").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
         builder.onInit(onInit)
                 .onUpdateDriverState(onUpdateDriverState)
                 .onNeedQrCode(onNeedQrCode);
@@ -84,8 +86,9 @@ class WhatsAppClientTest {
     }
 
     @BeforeEach
-    void updateTestChat() {
+    void updateTestChat() throws InterruptedException {
         if (chatTest != null) {
+            TimeUnit.SECONDS.sleep(5);
             chatTest.update().orTimeout(30, TimeUnit.SECONDS).join();
         }
     }
@@ -109,7 +112,8 @@ class WhatsAppClientTest {
     void sendSimpleMsg() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withText("test")).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertEquals("test", sendMsg.getBody());
+        assertTrue(sendMsg.getMessageContent() instanceof Message.MessageContent.MessageTextContent);
+        assertEquals("test", ((Message.MessageContent.MessageTextContent) sendMsg.getMessageContent()).getText());
     }
 
     @Test
@@ -117,7 +121,8 @@ class WhatsAppClientTest {
     void sendSimpleMsgWithMention() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withText("test").withMentionToContact(contactTest.getId())).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertEquals("test", sendMsg.getBody());
+        assertTrue(sendMsg.getMessageContent() instanceof Message.MessageContent.MessageTextContent);
+        assertEquals("test", ((Message.MessageContent.MessageTextContent) sendMsg.getMessageContent()).getText());
     }
 
     @Test
@@ -125,7 +130,8 @@ class WhatsAppClientTest {
     void sendSimpleMsgQuoted() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withText("test").withQuotedMsg(chatTest.getLastMsg().getId())).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertEquals("test", sendMsg.getBody());
+        assertTrue(sendMsg.getMessageContent() instanceof Message.MessageContent.MessageTextContent);
+        assertEquals("test", ((Message.MessageContent.MessageTextContent) sendMsg.getMessageContent()).getText());
     }
 
     @Test
@@ -133,7 +139,6 @@ class WhatsAppClientTest {
     void sendLocation() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353)).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof GeoMessage);
     }
 
     @Test
@@ -141,7 +146,6 @@ class WhatsAppClientTest {
     void sendLocationWithName() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353, locationBuilder -> locationBuilder.withName("name"))).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof GeoMessage);
     }
 
     @Test
@@ -149,7 +153,6 @@ class WhatsAppClientTest {
     void sendLocationWithNameAndDescription() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withLocation(-24.403799, -53.523353, locationBuilder -> locationBuilder.withName("name").withDescription("description"))).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof GeoMessage);
     }
 
     @Test
@@ -157,7 +160,6 @@ class WhatsAppClientTest {
     void sendVCard() {
         var sendMsg = chatTest.sendMessage(builder -> builder.withVCard("João", "5544997258328")).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof VCardMessage);
     }
 
     @Test
@@ -166,7 +168,6 @@ class WhatsAppClientTest {
         var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
         var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID)).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof MediaMessage);
     }
 
     @Test
@@ -175,8 +176,6 @@ class WhatsAppClientTest {
         var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
         var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withCaption("caption"))).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof MediaMessage);
-        assertEquals("caption", ((MediaMessage) sendMsg).getCaption());
     }
 
     @Test
@@ -185,7 +184,6 @@ class WhatsAppClientTest {
         var uploadedUUID = whatsAppClient.uploadFile(new File("filesTest/image.png")).join();
         var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withForceDocument(true))).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof MediaMessage);
     }
 
     @Test
@@ -194,7 +192,6 @@ class WhatsAppClientTest {
         var uploadedUUID = whatsAppClient.uploadFile("image.webp", new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
         var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID)).join();
         assertNotNull(sendMsg);
-        assertTrue(sendMsg instanceof MediaMessage);
     }
 
     @Test
@@ -240,7 +237,7 @@ class WhatsAppClientTest {
     @Test
     @Order(100)
     void checkClearChat() {
-        assertTrue(chatTest.getAllMessages().size() <= 3);
+        assertTrue(chatTest.getMessages().size() <= 3);
     }
 
     @Test

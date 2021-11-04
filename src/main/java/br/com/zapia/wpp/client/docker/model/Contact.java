@@ -1,7 +1,7 @@
 package br.com.zapia.wpp.client.docker.model;
 
 import br.com.zapia.wpp.client.docker.WhatsAppClient;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonObject;
 
 import javax.swing.text.MaskFormatter;
 import java.io.File;
@@ -10,14 +10,59 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class Contact extends WhatsAppObjectWithId {
+public class Contact extends WhatsAppObjectWithId<Contact> {
 
+    private String name;
+    private String shortName;
+    private String pushName;
     private String phoneNumber;
 
-    public Contact(WhatsAppClient client, JsonNode jsonNode) {
-        super(client, jsonNode);
-        String id = this.getId();
-        String phoneTemp = id.split("@")[0];
+    protected Contact(WhatsAppClient client, JsonObject jsonObject) {
+        super(client, jsonObject);
+    }
+
+    public CompletableFuture<File> getProfilePic() {
+        return getProfilePic(false);
+    }
+
+    public CompletableFuture<File> getProfilePic(boolean full) {
+        return getClient().getProfilePic(getId(), full);
+    }
+
+    public String getSafeName() {
+        if (!getPushName().isEmpty()) {
+            return getPushName();
+        } else if (!getName().isEmpty()) {
+            return getName();
+        } else {
+            return "Name Error";
+        }
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public String getPhoneNumberNoFormatted() {
+        return phoneNumber.replaceAll("[^0-9]+", "");
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getShortName() {
+        return shortName;
+    }
+
+    public String getPushName() {
+        return pushName;
+    }
+
+    @Override
+    void build() {
+        super.build();
+        String phoneTemp = getId().split("@")[0];
         phoneTemp = phoneTemp.substring(2);
         if (phoneTemp.length() == 10) {
             try {
@@ -37,65 +82,16 @@ public class Contact extends WhatsAppObjectWithId {
             }
         }
         phoneNumber = phoneTemp;
+        name = jsonObject.get("name").getAsString();
+        shortName = jsonObject.get("shortName").getAsString();
+        pushName = jsonObject.get("pushName").getAsString();
     }
 
-    public CompletableFuture<File> getProfilePic() {
-        return getProfilePic(false);
-    }
-
-    public CompletableFuture<File> getProfilePic(boolean full) {
-        return getClient().getProfilePic(getId(), full);
-    }
-
-    public String getSafeName() {
-        if (getPushName() != null) {
-            return getPushName();
-        } else if (getName() != null) {
-            return getName();
-        } else if (getFormattedName() != null) {
-            return getFormattedName();
-        } else {
-            return "Name Error";
-        }
-    }
-
-    public String getPhoneNumber() {
-        return phoneNumber;
-    }
-
-    public String getPhoneNumberNoFormatted() {
-        return phoneNumber.replaceAll("[^0-9]+", "");
-    }
-
-    public String getShortName() {
-        if (getJsonNode().hasNonNull("shortName") && getJsonNode().get("shortName").isTextual()) {
-            return getJsonNode().get("shortName").asText();
-        } else {
-            return null;
-        }
-    }
-
-    public String getName() {
-        if (getJsonNode().hasNonNull("name") && getJsonNode().get("name").isTextual()) {
-            return getJsonNode().get("name").asText();
-        } else {
-            return null;
-        }
-    }
-
-    public String getPushName() {
-        if (getJsonNode().hasNonNull("pushname") && getJsonNode().get("pushname").isTextual()) {
-            return getJsonNode().get("pushname").asText();
-        } else {
-            return null;
-        }
-    }
-
-    public String getFormattedName() {
-        if (getJsonNode().hasNonNull("formattedName") && getJsonNode().get("formattedName").isTextual()) {
-            return getJsonNode().get("formattedName").asText();
-        } else {
-            return null;
-        }
+    @Override
+    protected void update(Contact baseWhatsAppObject) {
+        super.update(baseWhatsAppObject);
+        name = baseWhatsAppObject.name;
+        shortName = baseWhatsAppObject.shortName;
+        pushName = baseWhatsAppObject.pushName;
     }
 }
