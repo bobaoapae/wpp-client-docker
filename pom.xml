@@ -4,11 +4,11 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>br.com.zapia</groupId>
     <artifactId>wpp-client-docker</artifactId>
-    <version>4.1</version>
+    <version>4.2</version>
     <name>wpp-client-docker</name>
 
     <properties>
-        <java.version>16</java.version>
+        <java.version>17</java.version>
     </properties>
 
     <dependencies>

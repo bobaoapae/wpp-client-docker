@@ -98,8 +98,6 @@ public class DockerConfig extends BaseConfig {
                         .withMemory(1024L * 1024L * maxMemoryMB)
                         .withMemoryReservation((long) (1024L * 1024L * (maxMemoryMB * 0.8)))
                         .withMemorySwap((long) (1024L * 1024L * (maxMemoryMB * 1.3)))
-                        .withCpuPeriod(100000L)
-                        .withCpuQuota(20000L)
                         .withAutoRemove(autoRemoveContainer)
                         .withBinds(new Bind(insideDockerHostVolumeLocation + "/" + identity, chromeCache)));
                 CreateContainerResponse exec = containerCmd.exec();
