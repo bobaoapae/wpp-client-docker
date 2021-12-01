@@ -197,7 +197,7 @@ class WhatsAppClientTest {
     @Test
     @Order(13)
     void sendWebSite() {
-        var sendMsg = chatTest.sendMessage(builder -> builder.withWebSite("https://zapia.com.br")).orTimeout(10, TimeUnit.SECONDS).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withWebSite("https://zapia.com.br").withText("https://zapia.com.br")).orTimeout(10, TimeUnit.SECONDS).join();
         assertNotNull(sendMsg);
     }
 
