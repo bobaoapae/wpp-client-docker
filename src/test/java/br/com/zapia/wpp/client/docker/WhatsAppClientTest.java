@@ -192,7 +192,7 @@ class WhatsAppClientTest {
     @Order(12)
     void sendFileAsSticker() {
         var uploadedUUID = whatsAppClient.uploadFile("image.webp", new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
-        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID)).join();
+        var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withForceSticker("Zapiá", "Zapiá"))).join();
         assertNotNull(sendMsg);
         assertTrue(sendMsg instanceof MediaMessage);
     }
