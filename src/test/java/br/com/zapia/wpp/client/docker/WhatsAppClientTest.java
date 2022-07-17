@@ -191,7 +191,7 @@ class WhatsAppClientTest {
     @Test
     @Order(12)
     void sendFileAsSticker() {
-        var uploadedUUID = whatsAppClient.uploadFile("image.webp", new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
+        var uploadedUUID = whatsAppClient.uploadFile("image.png", new File("filesTest/image.png")).orTimeout(10, TimeUnit.SECONDS).join();
         var sendMsg = chatTest.sendMessage(builder -> builder.withFile(uploadedUUID, fileBuilder -> fileBuilder.withForceSticker("Zapiá", "Zapiá"))).join();
         assertNotNull(sendMsg);
         assertTrue(sendMsg instanceof MediaMessage);
@@ -246,6 +246,6 @@ class WhatsAppClientTest {
     @Test
     @Order(101)
     void deleteChat() {
-        assertTrue(chatTest.delete().orTimeout(30, TimeUnit.SECONDS).orTimeout(10, TimeUnit.SECONDS).join());
+        assertTrue(chatTest.delete().orTimeout(10, TimeUnit.SECONDS).join());
     }
 }
