@@ -27,6 +27,9 @@ public class DockerConfig extends BaseConfig {
     private static final Logger logger = Logger.getLogger(DockerConfig.class.getName());
 
     private final String identity;
+    private String dockerImageName;
+    private String dockerUserName;
+    private String dockerPassword;
     private final String remoteAddress;
     private final int remotePort;
     private final String insideDockerHostVolumeLocation;
@@ -38,8 +41,11 @@ public class DockerConfig extends BaseConfig {
 
     private final DockerClient dockerClient;
 
-    public DockerConfig(String identity, String remoteAddress, int remotePort, String insideDockerHostVolumeLocation, int maxMemoryMB, boolean autoUpdateBaseImage, boolean autoRemoveContainer) {
+    public DockerConfig(String identity, String dockerImageName, String dockerUserName, String dockerPassword, String remoteAddress, int remotePort, String insideDockerHostVolumeLocation, int maxMemoryMB, boolean autoUpdateBaseImage, boolean autoRemoveContainer) {
         this.identity = identity;
+        this.dockerImageName = dockerImageName;
+        this.dockerUserName = dockerUserName;
+        this.dockerPassword = dockerPassword;
         this.remoteAddress = remoteAddress;
         this.remotePort = remotePort;
         this.insideDockerHostVolumeLocation = insideDockerHostVolumeLocation;
@@ -63,7 +69,7 @@ public class DockerConfig extends BaseConfig {
                 if (autoUpdateBaseImage) {
                     try {
                         RemoveImageCmd removeImageCmd = dockerClient
-                                .removeImageCmd("bobaoapae/whatsapp-api:latest")
+                                .removeImageCmd(dockerImageName)
                                 .withForce(true);
 
                         removeImageCmd.exec();
@@ -72,8 +78,8 @@ public class DockerConfig extends BaseConfig {
                     }
 
                     PullImageCmd pullImageCmd = dockerClient
-                            .pullImageCmd("bobaoapae/whatsapp-api:latest")
-                            .withAuthConfig(dockerClient.authConfig().withUsername("bobaoapae").withPassword("joao0123@"));
+                            .pullImageCmd(dockerImageName)
+                            .withAuthConfig(dockerClient.authConfig().withUsername(dockerUserName).withPassword(dockerPassword));
 
                     pullImageCmd.exec(new PullImageResultCallback() {
                         @Override
@@ -91,7 +97,7 @@ public class DockerConfig extends BaseConfig {
                 }
                 stop();
                 Volume chromeCache = new Volume("/home/chrome/cacheWhatsApp");
-                CreateContainerCmd containerCmd = dockerClient.createContainerCmd("bobaoapae/whatsapp-api:latest");
+                CreateContainerCmd containerCmd = dockerClient.createContainerCmd(dockerImageName);
                 containerCmd.withName("whatsapp-api-" + identity);
                 containerCmd.withHostConfig(HostConfig.newHostConfig()
                         .withPublishAllPorts(true)

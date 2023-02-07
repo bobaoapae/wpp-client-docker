@@ -74,7 +74,7 @@ class WhatsAppClientTest {
             driverUpdate.complete(null);
         };
 
-        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "localhost").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
+        WhatsAppClientBuilder builder = new WhatsAppClientBuilder(new DockerConfigBuilder("teste", "bobaoapae/whatsapp-api:latest","localhost").withDockerUserName("bobaoapae").withDockerUserName("joao0123@").withAutoUpdateBaseImage(false).withMaxMemoryMB(700).build());
         builder.onInit(onInit)
                 .onUpdateDriverState(onUpdateDriverState)
                 .onNeedQrCode(onNeedQrCode);
