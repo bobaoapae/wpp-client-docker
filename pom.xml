@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>br.com.zapia</groupId>
     <artifactId>wpp-client-docker</artifactId>
-    <version>4.4</version>
+    <version>4.5</version>
     <name>wpp-client-docker</name>
 
     <properties>
@@ -16,6 +16,41 @@
             <groupId>com.github.docker-java</groupId>
             <artifactId>docker-java</artifactId>
             <version>3.2.14</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-common</artifactId>
+            <version>2.34</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk15on</artifactId>
+            <version>1.70</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.14</version>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
+            <version>4.1.87.Final</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.15</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>31.1-jre</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.14.2</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
